@@ -442,8 +442,103 @@ Begin comprehensive research for {company} now. Be thorough and systematic.
     
     return prompt
 
+def query_gemini_api(api_key, prompt, timeout=120):
+    """Query Google Gemini API for contact research"""
+    try:
+        import google.generativeai as genai
+        
+        # Configure Gemini
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        
+        # Generate response
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.1,
+                max_output_tokens=4000,
+            )
+        )
+        
+        return response.text
+        
+    except ImportError:
+        st.error("Google GenerativeAI library not installed. Using OpenRouter fallback.")
+        return None
+    except Exception as e:
+        st.error(f"Gemini API error: {e}")
+        return None
+
+def get_available_ai_providers(openrouter_key=None, gemini_key=None):
+    """Get list of available AI providers and their models"""
+    providers = {}
+    
+    # OpenRouter models
+    if openrouter_key:
+        try:
+            resp = requests.get("https://openrouter.ai/api/v1/models", 
+                               headers={"Authorization": f"Bearer {openrouter_key}"})
+            models = resp.json()["data"]
+            
+            # Categorize OpenRouter models
+            free_models = []
+            web_search_models = []
+            premium_models = []
+            
+            for model in models:
+                model_id = model["id"]
+                model_name = model.get("name", model_id)
+                pricing = model.get("pricing", {})
+                
+                is_free = (pricing.get("prompt", "0") == "0" and 
+                          pricing.get("completion", "0") == "0")
+                
+                if any(keyword in model_id.lower() for keyword in 
+                       ["perplexity", "online", "web", "search", "sonar"]):
+                    web_search_models.append((model_id, f"{model_name} (Web Search)"))
+                elif is_free:
+                    free_models.append((model_id, f"{model_name} (Free)"))
+                else:
+                    premium_models.append((model_id, f"{model_name}"))
+            
+            providers["openrouter"] = {
+                "name": "OpenRouter",
+                "models": {
+                    "web_search": sorted(web_search_models),
+                    "free": sorted(free_models),
+                    "premium": sorted(premium_models)
+                }
+            }
+        except:
+            pass
+    
+    # Gemini models
+    if gemini_key:
+        providers["gemini"] = {
+            "name": "Google Gemini",
+            "models": {
+                "gemini": [
+                    ("gemini-1.5-pro-latest", "Gemini 1.5 Pro (Latest)"),
+                    ("gemini-1.5-pro", "Gemini 1.5 Pro"),
+                    ("gemini-1.5-flash", "Gemini 1.5 Flash (Faster)"),
+                    ("gemini-pro", "Gemini Pro")
+                ]
+            }
+        }
+    
+    return providers
+
+def query_ai_enhanced(provider, api_key, model, prompt, timeout=120):
+    """Enhanced AI query supporting multiple providers"""
+    if provider == "openrouter":
+        return query_openrouter_enhanced(api_key, model, prompt, timeout)
+    elif provider == "gemini":
+        return query_gemini_api(api_key, prompt, timeout)
+    else:
+        st.error(f"Unknown AI provider: {provider}")
+        return None
 def query_openrouter_enhanced(api_key, model, prompt, timeout=120):
-    """Enhanced API query with better error handling and longer timeout"""
+    """Enhanced OpenRouter API query with better error handling"""
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -584,7 +679,7 @@ def get_whois_contacts(domain):
             'error': f'WHOIS lookup failed: {str(e)}'
         }
 
-def process_single_company(api_key, model, company, website, country, industry="", search_methods=None):
+def process_single_company(provider, api_key, model, company, website, country, industry="", search_methods=None):
     """Process a single company and return results"""
     try:
         # Validate website
@@ -609,6 +704,8 @@ def process_single_company(api_key, model, company, website, country, industry="
             'whois_data': None,
             'ai_research': None,
             'web_scraping_data': None,
+            'ai_provider': provider,
+            'ai_model': model,
             'processed_at': datetime.now()
         }
         
@@ -624,7 +721,7 @@ def process_single_company(api_key, model, company, website, country, industry="
         # AI research
         if "AI Research" in search_methods:
             prompt = create_comprehensive_search_prompt(company, website, country, industry)
-            results['ai_research'] = query_openrouter_enhanced(api_key, model, prompt)
+            results['ai_research'] = query_ai_enhanced(provider, api_key, model, prompt)
         
         return results
         
@@ -742,63 +839,122 @@ def main():
     )
     
     st.title("🔍 AI-Powered Contact Finder")
-    st.markdown("*Web scraping + AI research + WHOIS lookup + Professional networks + Batch processing*")
-    st.markdown("**✅ Streamlit Cloud Compatible Version**")
+    st.markdown("*Web scraping + Multi-AI research + WHOIS lookup + Professional networks + Batch processing*")
+    st.markdown("**✅ Supports OpenRouter (100+ models) + Google Gemini (latest AI)**")
     
-    # Load API key from Streamlit secrets or user input
-    api_key = None
+    # Load API keys from Streamlit secrets or user input
+    st.subheader("🔐 AI Provider Configuration")
+    
+    # Check for API keys in secrets
+    openrouter_key = None
+    gemini_key = None
+    
     try:
-        api_key = st.secrets.get("OPENROUTER_API_KEY")
+        openrouter_key = st.secrets.get("OPENROUTER_API_KEY")
+        gemini_key = st.secrets.get("GEMINI_API_KEY")
     except:
         pass
     
-    if not api_key:
-        api_key = st.text_input(
-            "🔐 OpenRouter API Key", 
-            type="password",
-            help="Get your API key from https://openrouter.ai/"
-        )
+    # Create columns for API key inputs
+    col1, col2 = st.columns(2)
     
-    if not api_key:
-        st.error("API key required to proceed")
-        st.info("💡 You can either add OPENROUTER_API_KEY to Streamlit secrets or enter it above")
+    with col1:
+        st.markdown("**OpenRouter API**")
+        if not openrouter_key:
+            openrouter_key = st.text_input(
+                "OpenRouter API Key", 
+                type="password",
+                help="Get your API key from https://openrouter.ai/",
+                key="openrouter_input"
+            )
+        else:
+            st.success("✅ OpenRouter API key loaded from secrets")
+    
+    with col2:
+        st.markdown("**Google Gemini API**")
+        if not gemini_key:
+            gemini_key = st.text_input(
+                "Gemini API Key", 
+                type="password",
+                help="Get your API key from https://aistudio.google.com/",
+                key="gemini_input"
+            )
+        else:
+            st.success("✅ Gemini API key loaded from secrets")
+    
+    # Check if at least one API key is available
+    if not openrouter_key and not gemini_key:
+        st.error("At least one API key is required to proceed")
+        st.info("💡 You can add API keys to Streamlit secrets or enter them above")
+        st.markdown("""
+        **Get API Keys:**
+        - **OpenRouter**: [openrouter.ai](https://openrouter.ai/) (Access to 100+ models)
+        - **Google Gemini**: [aistudio.google.com](https://aistudio.google.com/) (Free tier available)
+        """)
         st.stop()
     
-    # Get models with error handling
-    with st.spinner("Loading available models..."):
-        models_dict = get_openrouter_models(api_key)
+    # Get available providers and models
+    with st.spinner("Loading AI providers and models..."):
+        providers = get_available_ai_providers(openrouter_key, gemini_key)
     
-    if not any(models_dict.values()):
-        st.error("Failed to load models. Please check your API key.")
+    if not providers:
+        st.error("Failed to load any AI providers. Please check your API keys.")
         st.stop()
     
     # Sidebar configuration
     with st.sidebar:
         st.header("⚙️ Configuration")
         
-        # Model selection with persistence
-        st.subheader("🤖 AI Model Selection")
+        # AI Provider and Model selection with persistence
+        st.subheader("🤖 AI Provider & Model Selection")
         
-        model_category = st.selectbox(
-            "Model Category",
-            ["Web Search Models (Recommended)", "Free Models", "Premium Models"],
-            help="Web Search models can access real-time internet data"
+        # Provider selection
+        provider_names = list(providers.keys())
+        provider_options = [providers[p]["name"] for p in provider_names]
+        
+        if 'selected_provider' not in st.session_state:
+            st.session_state.selected_provider = provider_names[0] if provider_names else None
+        
+        selected_provider_idx = st.selectbox(
+            "AI Provider",
+            range(len(provider_options)),
+            index=provider_names.index(st.session_state.selected_provider) if st.session_state.selected_provider in provider_names else 0,
+            format_func=lambda x: provider_options[x],
+            help="Choose between OpenRouter (100+ models) or Google Gemini (latest models)"
         )
         
-        if model_category == "Web Search Models (Recommended)":
-            available_models = models_dict["web_search"]
-        elif model_category == "Free Models":
-            available_models = models_dict["free"]
+        selected_provider = provider_names[selected_provider_idx]
+        st.session_state.selected_provider = selected_provider
+        
+        # Model category selection (for OpenRouter)
+        if selected_provider == "openrouter":
+            model_category = st.selectbox(
+                "Model Category",
+                ["Web Search Models (Recommended)", "Free Models", "Premium Models"],
+                help="Web Search models can access real-time internet data"
+            )
+            
+            if model_category == "Web Search Models (Recommended)":
+                available_models = providers["openrouter"]["models"]["web_search"]
+            elif model_category == "Free Models":
+                available_models = providers["openrouter"]["models"]["free"]
+            else:
+                available_models = providers["openrouter"]["models"]["premium"]
         else:
-            available_models = models_dict["premium"]
+            # Gemini models
+            available_models = providers["gemini"]["models"]["gemini"]
         
         if available_models:
             model_options = [f"{name}" for _, name in available_models]
             model_ids = [model_id for model_id, _ in available_models]
             
             # Use session state to persist selection
-            if st.session_state.selected_model and st.session_state.selected_model in model_ids:
-                default_idx = model_ids.index(st.session_state.selected_model)
+            session_key = f'selected_model_{selected_provider}'
+            if session_key not in st.session_state:
+                st.session_state[session_key] = None
+            
+            if st.session_state[session_key] and st.session_state[session_key] in model_ids:
+                default_idx = model_ids.index(st.session_state[session_key])
             else:
                 default_idx = 0
             
@@ -810,10 +966,16 @@ def main():
             )
             
             selected_model = model_ids[selected_idx]
-            st.session_state.selected_model = selected_model
+            st.session_state[session_key] = selected_model
         else:
-            st.error(f"No models available in {model_category}")
+            st.error(f"No models available for {providers[selected_provider]['name']}")
             st.stop()
+        
+        # Show provider info
+        if selected_provider == "openrouter":
+            st.info("🌐 **OpenRouter**: Access to 100+ AI models including Perplexity web search")
+        elif selected_provider == "gemini":
+            st.info("🧠 **Google Gemini**: Latest Google AI with excellent reasoning capabilities")
         
         # Search settings
         st.subheader("🔍 Search Methods")
@@ -887,8 +1049,12 @@ def main():
             
             # Process single company
             with st.spinner("Conducting comprehensive multi-method research..."):
+                # Get the appropriate API key
+                current_api_key = openrouter_key if selected_provider == "openrouter" else gemini_key
+                
                 result = process_single_company(
-                    api_key, selected_model, company, website, country, industry, search_methods
+                    selected_provider, current_api_key, selected_model, 
+                    company, website, country, industry, search_methods
                 )
             
             # Display results
@@ -900,19 +1066,23 @@ def main():
         
         # CSV template download
         template_df = pd.DataFrame({
-            'company': ['Example Corp', 'Another Company'],
-            'website': ['example.com', 'anothercompany.com'],
-            'country': ['Germany', 'USA'],
-            'industry': ['Technology', 'Manufacturing']
+            'company': ['Example Corp', 'Müller GmbH', 'José & Associates'],
+            'website': ['example.com', 'mueller-company.de', 'jose-associates.com'],
+            'country': ['Germany', 'Germany', 'Spain'],
+            'industry': ['Technology', 'Manufacturing', 'Consulting']
         })
         
-        csv_template = template_df.to_csv(index=False)
+        # Create UTF-8 encoded CSV
+        csv_template = template_df.to_csv(index=False, encoding='utf-8')
         st.download_button(
-            "📥 Download CSV Template",
-            data=csv_template,
+            "📥 Download CSV Template (UTF-8)",
+            data=csv_template.encode('utf-8'),
             file_name="ai_contact_finder_template.csv",
-            mime="text/csv"
+            mime="text/csv",
+            help="Template includes international characters to test encoding"
         )
+        
+        st.info("💡 **Important**: Save your CSV as UTF-8 format to avoid encoding errors with special characters (ä, ö, ü, é, etc.)")
         
         # File upload
         uploaded_file = st.file_uploader(
@@ -923,7 +1093,28 @@ def main():
         
         if uploaded_file:
             try:
-                companies_df = pd.read_csv(uploaded_file)
+                # Try to read CSV with different encodings
+                companies_df = None
+                encodings_to_try = ['utf-8', 'utf-8-sig', 'iso-8859-1', 'windows-1252', 'cp1252']
+                
+                for encoding in encodings_to_try:
+                    try:
+                        # Reset file pointer
+                        uploaded_file.seek(0)
+                        companies_df = pd.read_csv(uploaded_file, encoding=encoding)
+                        st.success(f"✅ CSV loaded successfully with {encoding} encoding")
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                    except Exception as e:
+                        if encoding == encodings_to_try[-1]:  # Last encoding attempt
+                            raise e
+                        continue
+                
+                if companies_df is None:
+                    st.error("Could not read CSV file with any supported encoding. Please save as UTF-8.")
+                    st.info("💡 **Tip**: In Excel, use 'Save As' → 'CSV UTF-8 (Comma delimited)' format")
+                    return
                 
                 # Validate required columns
                 required_cols = ['company', 'website', 'country']
@@ -931,16 +1122,75 @@ def main():
                 
                 if missing_cols:
                     st.error(f"Missing required columns: {missing_cols}")
+                    st.info("Required columns: company, website, country, industry (optional)")
                     return
                 
-                st.success(f"Loaded {len(companies_df)} companies")
-                st.dataframe(companies_df.head())
+                # Clean up data
+                companies_df = companies_df.dropna(subset=['company', 'website'])  # Remove rows with missing required data
+                companies_df['company'] = companies_df['company'].astype(str).str.strip()
+                companies_df['website'] = companies_df['website'].astype(str).str.strip()
+                companies_df['country'] = companies_df['country'].astype(str).str.strip()
+                
+                if len(companies_df) == 0:
+                    st.error("No valid companies found in CSV after cleaning")
+                    return
+                
+                st.success(f"✅ Loaded {len(companies_df)} companies")
+                st.dataframe(companies_df.head(10))  # Show first 10 rows
+                
+                if len(companies_df) > 50:
+                    st.warning(f"⚠️ Large batch detected ({len(companies_df)} companies). Consider processing in smaller chunks for better performance.")
                 
                 if st.button("🚀 Process All Companies", type="primary"):
-                    process_batch_csv(companies_df, api_key, selected_model, search_methods)
+                    # Get the appropriate API key
+                    current_api_key = openrouter_key if selected_provider == "openrouter" else gemini_key
+                    process_batch_csv(companies_df, selected_provider, current_api_key, selected_model, search_methods)
                     
             except Exception as e:
                 st.error(f"Error reading CSV file: {e}")
+                
+                # Provide helpful troubleshooting info
+                with st.expander("🔧 CSV Troubleshooting Tips"):
+                    st.markdown("""
+                    **Common CSV Issues & Solutions:**
+                    
+                    **Character Encoding Problems:**
+                    - Save your CSV as "UTF-8" format in Excel
+                    - In Excel: File → Save As → CSV UTF-8 (Comma delimited)
+                    - In Google Sheets: File → Download → CSV (UTF-8)
+                    
+                    **Required Columns:**
+                    - `company` - Company name (required)
+                    - `website` - Website URL (required) 
+                    - `country` - Country location (required)
+                    - `industry` - Industry sector (optional)
+                    
+                    **Data Format:**
+                    ```csv
+                    company,website,country,industry
+                    Example Corp,example.com,Germany,Technology
+                    Another Company,anothercompany.com,USA,Manufacturing
+                    ```
+                    
+                    **Special Characters:**
+                    - Avoid special characters in company names if possible
+                    - Use UTF-8 encoding to support international characters
+                    - Remove any extra spaces or hidden characters
+                    """)
+                
+                # Show file info for debugging
+                try:
+                    uploaded_file.seek(0)
+                    file_content = uploaded_file.read()
+                    st.info(f"📁 File size: {len(file_content)} bytes")
+                    
+                    # Try to detect encoding
+                    import chardet
+                    detected = chardet.detect(file_content)
+                    if detected:
+                        st.info(f"🔍 Detected encoding: {detected.get('encoding', 'Unknown')} (confidence: {detected.get('confidence', 0):.2%})")
+                except:
+                    pass
 
 def display_single_result(result, search_methods):
     """Display results for a single company"""
@@ -988,7 +1238,8 @@ def display_single_result(result, search_methods):
     
     # AI Research Results
     if "AI Research" in search_methods and result.get('ai_research'):
-        st.subheader("🧠 AI Research Results")
+        ai_provider_name = "Google Gemini" if result.get('ai_provider') == "gemini" else "OpenRouter"
+        st.subheader(f"🧠 AI Research Results ({ai_provider_name})")
         
         with st.expander("📄 Full Research Report", expanded=True):
             st.markdown(result['ai_research'])
@@ -998,6 +1249,13 @@ def display_single_result(result, search_methods):
         if df is not None:
             st.subheader("📊 Structured Contact Data")
             st.dataframe(df, use_container_width=True)
+            
+            # Show contact count info
+            contact_count = len(df)
+            if contact_count > 1:
+                st.success(f"🎯 Found {contact_count} contacts using {ai_provider_name}! In batch processing, this would create {contact_count} separate rows in your results CSV.")
+            elif contact_count == 1:
+                st.info(f"📧 Found 1 contact using {ai_provider_name}. Additional contacts may be found through website scraping.")
             
             # Export options
             timestamp = datetime.now().strftime("%Y%m%d_%H%M")
@@ -1022,7 +1280,7 @@ def display_single_result(result, search_methods):
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
 
-def process_batch_companies(api_key, model, companies_df, search_methods, progress_callback=None):
+def process_batch_companies(provider, api_key, model, companies_df, search_methods, progress_callback=None):
     """Process multiple companies with progress tracking"""
     results = []
     total = len(companies_df)
@@ -1032,7 +1290,7 @@ def process_batch_companies(api_key, model, companies_df, search_methods, progre
             progress_callback(idx + 1, total, f"Processing {row.get('company', 'Unknown')}")
         
         result = process_single_company(
-            api_key, model,
+            provider, api_key, model,
             row.get('company', ''),
             row.get('website', ''),
             row.get('country', ''),
@@ -1046,7 +1304,7 @@ def process_batch_companies(api_key, model, companies_df, search_methods, progre
     
     return results
 
-def process_batch_csv(companies_df, api_key, selected_model, search_methods):
+def process_batch_csv(companies_df, provider, api_key, model, search_methods):
     """Process batch CSV with progress tracking"""
     st.subheader("🔄 Batch Processing Progress")
     
@@ -1060,7 +1318,7 @@ def process_batch_csv(companies_df, api_key, selected_model, search_methods):
     
     # Process all companies
     results = process_batch_companies(
-        api_key, selected_model, companies_df, search_methods, update_progress
+        provider, api_key, model, companies_df, search_methods, update_progress
     )
     
     # Clear progress indicators
@@ -1073,7 +1331,7 @@ def process_batch_csv(companies_df, api_key, selected_model, search_methods):
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Total Processed", len(results))
+        st.metric("Companies Processed", len(results))
     with col2:
         st.metric("Successful", len(successful_results))
     with col3:
@@ -1088,6 +1346,7 @@ def process_batch_csv(companies_df, api_key, selected_model, search_methods):
     # Combine all successful results into downloadable format
     if successful_results:
         all_contacts = []
+        total_contacts_found = 0
         
         for result in successful_results:
             # Combine Web Scraping and AI results
@@ -1140,11 +1399,25 @@ def process_batch_csv(companies_df, api_key, selected_model, search_methods):
             
             if company_contacts:
                 all_contacts.extend(company_contacts)
+                total_contacts_found += len(company_contacts)
         
         if all_contacts:
             combined_df = pd.DataFrame(all_contacts)
             
             st.subheader("📊 Combined Results")
+            
+            # Show summary of multiple contacts
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Companies Input", len(successful_results))
+            with col2:
+                st.metric("Contact Rows Output", len(combined_df))
+            with col3:
+                avg_contacts = len(combined_df) / len(successful_results) if successful_results else 0
+                st.metric("Avg Contacts/Company", f"{avg_contacts:.1f}")
+            
+            st.info("📋 **Multiple Contacts Structure**: Each contact gets its own row. Company information is repeated for each contact found.")
+            
             st.dataframe(combined_df, use_container_width=True)
             
             # Export combined results
@@ -1184,6 +1457,41 @@ def process_batch_csv(companies_df, api_key, selected_model, search_methods):
                     file_name=f"ai_batch_contacts_{timestamp}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
+            
+            # Show breakdown of results
+            with st.expander("📈 Detailed Results Breakdown"):
+                
+                # Count contacts by source
+                source_counts = combined_df['Source'].value_counts()
+                confidence_counts = combined_df['Confidence'].value_counts()
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.subheader("📊 Contacts by Source")
+                    for source, count in source_counts.items():
+                        st.metric(source, count)
+                
+                with col2:
+                    st.subheader("🎯 Contacts by Confidence")
+                    for confidence, count in confidence_counts.items():
+                        st.metric(f"{confidence} Confidence", count)
+                
+                # Show companies with most contacts
+                st.subheader("🏆 Top Companies by Contacts Found")
+                company_contact_counts = combined_df['Company'].value_counts().head(10)
+                for company, count in company_contact_counts.items():
+                    st.text(f"{company}: {count} contacts")
+                
+                # Show overall statistics
+                st.subheader("📋 Summary Statistics")
+                st.text(f"• Total companies processed: {len(successful_results)}")
+                st.text(f"• Total contact rows generated: {len(combined_df)}")
+                st.text(f"• Average contacts per company: {len(combined_df) / len(successful_results):.1f}")
+                st.text(f"• Companies with 5+ contacts: {len(company_contact_counts[company_contact_counts >= 5])}")
+                st.text(f"• Companies with 10+ contacts: {len(company_contact_counts[company_contact_counts >= 10])}")
+            
+            st.success(f"🎉 **Export Complete!** Your CSV contains {len(combined_df)} contact rows from {len(successful_results)} companies. Each contact is a separate row with full company details.")
 
     # Tips section
     with st.expander("💡 Tips & Best Practices"):
