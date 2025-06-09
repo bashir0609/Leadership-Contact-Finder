@@ -1,0 +1,195 @@
+# 🧠 Google Gemini Integration Guide
+
+Complete guide to adding Google Gemini API support to your AI Contact Finder.
+
+## ✅ **What's Added**
+
+The app now supports **dual AI providers**:
+- **OpenRouter**: 100+ models including Perplexity web search
+- **Google Gemini**: Latest Google AI with excellent reasoning
+
+## 🚀 **Quick Setup**
+
+### **1. Get Google Gemini API Key**
+1. Visit [Google AI Studio](https://aistudio.google.com/)
+2. Sign in with your Google account
+3. Click "Get API Key" in the left sidebar
+4. Create a new API key
+5. Copy the key for later use
+
+### **2. Add to Streamlit Cloud Secrets**
+In your Streamlit Cloud app settings, add:
+
+```toml
+# Both providers (recommended)
+OPENROUTER_API_KEY = "your_openrouter_key_here"
+GEMINI_API_KEY = "your_gemini_key_here"
+
+# Or just one provider
+GEMINI_API_KEY = "your_gemini_key_here"
+```
+
+### **3. Deploy Updated App**
+1. Update your `requirements.txt` with the new version
+2. Update your `streamlit_app.py` with the enhanced version  
+3. Push changes to GitHub
+4. App will auto-restart with dual provider support
+
+## 🎯 **Provider Comparison**
+
+| Feature | OpenRouter | Google Gemini |
+|---------|------------|---------------|
+| **Model Count** | 100+ models | 4 latest models |
+| **Web Search** | Perplexity models | Not available |
+| **Free Tier** | Some free models | Generous free tier |
+| **Speed** | Varies by model | Very fast |
+| **Quality** | Varies by model | Consistently high |
+| **Best For** | Variety, web search | Reasoning, analysis |
+
+## 🧠 **Gemini Models Available**
+
+### **Gemini 1.5 Pro (Latest)**
+- **Best for**: Complex reasoning, long context
+- **Context**: 1M+ tokens
+- **Speed**: Medium
+- **Quality**: Highest
+
+### **Gemini 1.5 Flash**
+- **Best for**: Fast responses, batch processing
+- **Context**: 1M+ tokens  
+- **Speed**: Fastest
+- **Quality**: High
+
+### **Gemini Pro**
+- **Best for**: General use, balanced performance
+- **Context**: 30K tokens
+- **Speed**: Fast
+- **Quality**: High
+
+## 📊 **Performance Comparison**
+
+Based on your screenshot showing excellent Gemini results for Max Planck Institute:
+
+### **Gemini Strengths:**
+- ✅ **Excellent structured output** (as shown in your screenshot)
+- ✅ **Accurate contact extraction** with names, roles, emails
+- ✅ **LinkedIn profile finding** with direct URLs
+- ✅ **Consistent formatting** in tables
+- ✅ **Fast processing** and reliable responses
+- ✅ **Free tier** for testing and light usage
+
+### **OpenRouter Strengths:**
+- ✅ **Web search capabilities** (Perplexity models)
+- ✅ **Model variety** (100+ options)
+- ✅ **Real-time data access** for current information
+- ✅ **Specialized models** for different use cases
+
+## 🎯 **Recommended Usage**
+
+### **For Best Results:**
+1. **Start with Gemini 1.5 Pro** for high-quality contact research
+2. **Use OpenRouter Perplexity** when you need web search capabilities
+3. **Batch processing**: Use Gemini 1.5 Flash for speed
+4. **Cost optimization**: Use Gemini free tier for testing
+
+### **Provider Selection Strategy:**
+
+#### **Use Gemini When:**
+- You want consistent, high-quality results
+- Processing established companies with good web presence
+- Need reliable structured output (like your Max Planck example)
+- Want to minimize costs (free tier)
+
+#### **Use OpenRouter When:**
+- You need real-time web search capabilities
+- Looking for recent news or changes
+- Want to try different model types
+- Need specialized models for specific industries
+
+## 🔧 **App Interface Changes**
+
+### **New Provider Selection:**
+```
+AI Provider: [Google Gemini ▼]
+Select Model: [Gemini 1.5 Pro (Latest) ▼]
+```
+
+### **Provider Info Display:**
+- **OpenRouter**: "🌐 Access to 100+ AI models including Perplexity web search"
+- **Gemini**: "🧠 Latest Google AI with excellent reasoning capabilities"
+
+### **Model Persistence:**
+- Model selection stays fixed per provider
+- Switch between providers without losing selections
+- Automatic fallback if one provider fails
+
+## ⚙️ **Configuration Options**
+
+### **Single Provider Setup:**
+```toml
+# Use only Gemini
+GEMINI_API_KEY = "your_key_here"
+```
+
+### **Dual Provider Setup:**
+```toml
+# Use both for maximum flexibility
+OPENROUTER_API_KEY = "your_openrouter_key"
+GEMINI_API_KEY = "your_gemini_key"
+```
+
+### **Manual Entry:**
+- App supports manual API key entry if secrets aren't configured
+- Keys are not stored or logged
+- Secure handling through Streamlit's input system
+
+## 📈 **Expected Results**
+
+Based on your Max Planck Institute example, Gemini excels at:
+
+### **Structured Contact Output:**
+```
+| Name | Role | LinkedIn URL | Email |
+|------|------|--------------|-------|
+| Christoph Weidenbach | Managing Director | linkedin.com/in/... | weidenb@mpi-inf.mpg.de |
+| Anja Feldmann | Director | linkedin.com/in/... | anja@mpi-inf.mpg.de |
+```
+
+### **High-Quality Data:**
+- ✅ Full names with proper titles
+- ✅ Direct LinkedIn profile URLs
+- ✅ Verified email addresses
+- ✅ Role/position accuracy
+- ✅ Consistent formatting
+
+## 🚀 **Getting Started**
+
+### **Quick Test:**
+1. Add Gemini API key to secrets
+2. Deploy updated app
+3. Select "Google Gemini" provider
+4. Choose "Gemini 1.5 Pro (Latest)"
+5. Test with the same Max Planck Institute query
+
+### **Migration from OpenRouter Only:**
+1. Keep existing OpenRouter setup
+2. Add Gemini API key
+3. Deploy updates
+4. Test both providers
+5. Choose preferred provider for different use cases
+
+## 💡 **Pro Tips**
+
+### **Cost Optimization:**
+- **Gemini free tier**: 15 requests per minute, 1500 per day
+- **Start with free tier** for testing
+- **Use Gemini Flash** for large batch processing
+- **Monitor usage** in Google AI Studio dashboard
+
+### **Quality Optimization:**
+- **Gemini 1.5 Pro**: Best for complex companies
+- **Include industry info**: Helps both providers
+- **Batch smaller groups**: Better quality than large batches
+- **Combine providers**: Use both for verification
+
+Your app now has **dual AI provider support** with Google Gemini's excellent contact finding capabilities alongside OpenRouter's model variety! 🎉
