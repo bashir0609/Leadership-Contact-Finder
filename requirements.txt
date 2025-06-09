@@ -1,6 +1,7 @@
-# requirements.txt
 streamlit
 requests
 pandas
-beautifulsoup4
 openpyxl
+beautifulsoup4
+email-validator
+Markdown
