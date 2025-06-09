@@ -13,6 +13,10 @@ import threading
 from bs4 import BeautifulSoup
 import urllib.robotparser
 import subprocess
+try:
+    from openpyxl.styles import Font, PatternFill, Alignment
+except ImportError:
+    pass  # openpyxl styling is optional
 
 # Initialize session state
 if 'selected_model' not in st.session_state:
@@ -357,87 +361,127 @@ def get_openrouter_models(api_key):
         return {"web_search": [], "free": [], "premium": []}
 
 def create_comprehensive_search_prompt(company, website, country, industry=""):
-    """Enhanced prompt for comprehensive contact finding"""
+    """Enhanced prompt that FORCES comprehensive multi-source searching"""
     domain = website.replace("https://", "").replace("http://", "").replace("www.", "").split("/")[0]
     
     prompt = f"""
-You are an expert business intelligence researcher with access to real-time web data. Your task is to find comprehensive contact information for {company} (website: {website}) in {country}.
+You are a professional business intelligence researcher. You MUST search ALL the sources listed below for {company} (website: {website}) in {country}.
 
-**COMPREHENSIVE SEARCH STRATEGY - Execute ALL sources:**
+**MANDATORY TASK: You must search EVERY single source below and report findings from EACH ONE:**
 
-1. **Official Website Deep Analysis**:
-   - {website}/contact, /about, /team, /staff, /leadership
-   - {website}/impressum (German sites), /mentions-legales (French)
-   - Subdirectories: /en/contact, /de/kontakt
-   - Extract ALL emails, names, phone numbers, addresses
+**SOURCE 1: OFFICIAL WEBSITE ANALYSIS**
+Search {website} thoroughly:
+- Main contact page, about page, team page
+- Leadership/management pages
+- Contact forms and directories
+- Impressum page (German sites)
+REPORT: What contacts did you find on their official website?
 
-2. **LinkedIn Professional Search**:
-   - Current employees at "{company}"
-   - Search variations: "{company} GmbH", "{company} Ltd", etc.
-   - Executives: CEO, CTO, CFO, VP, Director, Manager
-   - Department heads: HR, Sales, Marketing, Operations
-   - Get LinkedIn profile URLs and contact information
+**SOURCE 2: LINKEDIN PROFESSIONAL SEARCH**
+Search LinkedIn for "{company}" employees:
+- Current executives (CEO, CTO, CFO, Directors)
+- Department heads (HR, Sales, Marketing)
+- Key personnel with public profiles
+REPORT: Which LinkedIn profiles did you find with contact information?
 
-3. **Business Directory Mining**:
-   - Google Business listings
-   - Yelp, Yellow Pages, local directories
-   - Industry-specific directories
-   - Chamber of Commerce listings
-   - Better Business Bureau (US)
-   - Companies House (UK), Bundesanzeiger (Germany)
+**SOURCE 3: BUSINESS DIRECTORY SEARCH**
+Check business directories:
+- Google Business listing
+- Yellow Pages entries
+- Local chamber of commerce
+- Industry-specific directories
+REPORT: What directory listings exist for this company?
 
-4. **Professional Networks**:
-   - Xing.com (German-speaking countries)
-   - AngelList (startups)
-   - Crunchbase (funding/executive info)
-   - Industry association member directories
+**SOURCE 4: XING PROFESSIONAL NETWORK** (especially for German companies)
+Search Xing.com for company employees:
+- German business professionals
+- Executive profiles
+- Contact information
+REPORT: Which Xing profiles are available?
 
-5. **News & Press Coverage**:
-   - Recent press releases mentioning executives
-   - Industry publications and interviews
-   - Conference speaker lists
-   - Award announcements
-   - Local news mentions
+**SOURCE 5: NEWS AND PRESS SEARCH**
+Look for recent mentions:
+- Press releases with spokesperson contacts
+- News articles mentioning executives
+- Industry publication interviews
+- Conference speaker listings
+REPORT: What recent news mentions executives or contacts?
 
-6. **Technical Sources**:
-   - WHOIS domain registration data
-   - SSL certificate contact info
-   - DNS records and mail server information
-   - Cached versions (Wayback Machine)
+**SOURCE 6: TECHNICAL CONTACT SEARCH**
+Domain registration and technical info:
+- WHOIS registration data
+- SSL certificate information
+- DNS administrator contacts
+REPORT: What technical contact information is available?
 
-7. **Social Media & Web Presence**:
-   - Company Facebook, Twitter, Instagram pages
-   - YouTube channel information
-   - Medium, blog author information
-   - Podcast guest appearances
+**SOURCE 7: SOCIAL MEDIA BUSINESS PROFILES**
+Company social presence:
+- Facebook business page
+- Twitter/X corporate account
+- YouTube channel
+- Instagram business profile
+REPORT: What social media contacts are available?
 
-8. **Government & Legal Sources**:
-   - Corporate registration databases
-   - SEC filings (public companies)
-   - Patent applications
-   - Trademark registrations
-   - Court filings
+**SOURCE 8: GOVERNMENT AND LEGAL DATABASES**
+Official registrations:
+- Corporate registration databases
+- SEC filings (if public company)
+- Patent applications
+- Trademark registrations
+REPORT: What official government records show contacts?
 
-**OUTPUT FORMAT** (Markdown Table):
+**CRITICAL REQUIREMENT: You MUST provide a separate section for EACH source above, even if you find nothing.**
 
-| Name | Role/Title | LinkedIn/Profile URL | Email | Phone | Source | Confidence | Notes |
-|------|------------|---------------------|--------|-------|--------|------------|-------|
-| [Name or "General Contact"] | [Exact Title] | [Full URL] | [Email] | [Phone] | [Source] | [High/Med/Low] | [Additional info] |
+**OUTPUT FORMAT - EXACTLY like this:**
 
-**EMAIL PATTERNS TO CHECK**:
-- info@{domain}, contact@{domain}, hello@{domain}
-- sales@, support@, office@, admin@
-- firstname@, f.lastname@, firstname.lastname@
-- Common patterns for this country/industry
+## COMPREHENSIVE SEARCH RESULTS FOR {company}
 
-**CONFIDENCE LEVELS**:
-- **High**: Verified from official sources (website, LinkedIn, press)
-- **Medium**: Business directories, news articles
-- **Low**: Pattern-based estimates, unverified sources
+### SOURCE 1: OFFICIAL WEBSITE
+[Report findings from their website]
 
-**CRITICAL**: Search EVERY source mentioned above. Don't skip any category.
+### SOURCE 2: LINKEDIN SEARCH  
+[Report findings from LinkedIn]
 
-Begin comprehensive research for {company} now. Be thorough and systematic.
+### SOURCE 3: BUSINESS DIRECTORIES
+[Report findings from directories]
+
+### SOURCE 4: XING NETWORK
+[Report findings from Xing]
+
+### SOURCE 5: NEWS AND PRESS
+[Report findings from news/press]
+
+### SOURCE 6: TECHNICAL CONTACTS
+[Report findings from technical sources]
+
+### SOURCE 7: SOCIAL MEDIA
+[Report findings from social media]
+
+### SOURCE 8: GOVERNMENT RECORDS
+[Report findings from official records]
+
+### STRUCTURED CONTACT TABLE
+
+| Name | Role/Title | Email | Phone | LinkedIn/Profile URL | Source | Confidence |
+|------|------------|-------|-------|---------------------|--------|------------|
+| [Name] | [Title] | [Email] | [Phone] | [URL] | [Which source] | High/Medium/Low |
+| [Name] | [Title] | [Email] | [Phone] | [URL] | [Which source] | High/Medium/Low |
+
+**MANDATORY: You must fill in the table with ALL contacts found across ALL sources.**
+
+**EMAIL PATTERNS TO VERIFY:**
+- info@{domain}, contact@{domain}, office@{domain}
+- firstname.lastname@{domain}
+- f.lastname@{domain}
+
+**CONFIDENCE LEVELS:**
+- High: Verified from official sources
+- Medium: Found in reliable directories
+- Low: Estimated or unverified
+
+**FAILURE TO SEARCH ALL 8 SOURCES ABOVE IS UNACCEPTABLE.**
+
+Begin your comprehensive multi-source research now.
 """
     
     return prompt
@@ -815,34 +859,176 @@ def display_web_scraping_results(scraping_data):
                 st.markdown(f"- [{page}]({page})")
 
 def parse_ai_results_to_dataframe(ai_result):
-    """Parse AI research results into a structured dataframe"""
+    """Parse AI research results into a clean, structured dataframe"""
     if not ai_result:
         return None
     
     try:
-        lines = ai_result.split("\n")
-        table_lines = [line for line in lines if "|" in line and "---" not in line and "Name" in line or 
-                      ("|" in line and "---" not in line and len([cell for cell in line.split("|") if cell.strip()]) >= 4)]
+        # Method 1: Try to extract structured data from various formats
+        contacts = []
         
-        if len(table_lines) >= 2:
-            # Extract headers
-            headers = [cell.strip() for cell in table_lines[0].split("|") if cell.strip()]
-            
-            # Extract data rows
-            rows = []
-            for line in table_lines[1:]:
+        # Look for email patterns first
+        emails = re.findall(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', ai_result)
+        
+        # Look for phone patterns
+        phones = re.findall(r'(\+?\d{1,4}[-.\s]?)?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}', ai_result)
+        
+        # Method 2: Try table parsing
+        lines = ai_result.split("\n")
+        table_lines = []
+        
+        # Find lines that look like table rows
+        for line in lines:
+            if "|" in line and "---" not in line:
+                # Clean up the line
                 cells = [cell.strip() for cell in line.split("|") if cell.strip()]
                 if len(cells) >= 3:  # Minimum viable row
-                    # Pad with empty strings if needed
-                    while len(cells) < len(headers):
-                        cells.append("")
-                    rows.append(cells[:len(headers)])
+                    table_lines.append(cells)
+        
+        if len(table_lines) >= 2:
+            # Get headers from first line
+            headers = table_lines[0]
             
-            if rows:
-                df = pd.DataFrame(rows, columns=headers)
+            # Standardize headers
+            standard_headers = ["Name", "Role", "Email", "Phone", "LinkedIn", "Source", "Confidence", "Notes"]
+            header_mapping = {}
+            
+            for i, header in enumerate(headers):
+                header_lower = header.lower()
+                if any(word in header_lower for word in ["name", "person", "contact"]):
+                    header_mapping[i] = "Name"
+                elif any(word in header_lower for word in ["role", "title", "position", "job"]):
+                    header_mapping[i] = "Role"
+                elif any(word in header_lower for word in ["email", "mail", "@"]):
+                    header_mapping[i] = "Email"
+                elif any(word in header_lower for word in ["phone", "tel", "mobile", "+", "number"]):
+                    header_mapping[i] = "Phone"
+                elif any(word in header_lower for word in ["linkedin", "profile", "url", "link"]):
+                    header_mapping[i] = "LinkedIn"
+                elif any(word in header_lower for word in ["source", "from"]):
+                    header_mapping[i] = "Source"
+                elif any(word in header_lower for word in ["confidence", "quality", "reliability"]):
+                    header_mapping[i] = "Confidence"
+                else:
+                    header_mapping[i] = "Notes"
+            
+            # Extract data rows
+            for row_cells in table_lines[1:]:
+                contact = {
+                    "Name": "",
+                    "Role": "",
+                    "Email": "",
+                    "Phone": "",
+                    "LinkedIn": "",
+                    "Source": "AI Research",
+                    "Confidence": "Medium",
+                    "Notes": ""
+                }
+                
+                for i, cell in enumerate(row_cells):
+                    if i in header_mapping:
+                        field = header_mapping[i]
+                        contact[field] = cell.strip()
+                
+                # Clean up the contact data
+                if contact["Email"]:
+                    # Validate email
+                    email_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', contact["Email"])
+                    if email_match:
+                        contact["Email"] = email_match.group()
+                
+                if contact["Phone"]:
+                    # Clean phone number
+                    phone_clean = re.sub(r'[^\d+\-\s\(\)]', '', contact["Phone"])
+                    if len(phone_clean.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")) >= 7:
+                        contact["Phone"] = phone_clean.strip()
+                    else:
+                        contact["Phone"] = ""
+                
+                # Only add if we have meaningful data
+                if contact["Email"] or contact["Phone"] or contact["Name"]:
+                    contacts.append(contact)
+        
+        # Method 3: If table parsing failed, extract from text patterns
+        if not contacts:
+            text_lines = ai_result.split('\n')
+            current_contact = {}
+            
+            for line in text_lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Look for email in line
+                email_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', line)
+                if email_match:
+                    current_contact = {
+                        "Name": "",
+                        "Role": "",
+                        "Email": email_match.group(),
+                        "Phone": "",
+                        "LinkedIn": "",
+                        "Source": "AI Research",
+                        "Confidence": "Medium",
+                        "Notes": line
+                    }
+                    contacts.append(current_contact)
+        
+        # Method 4: Extract all emails and phones as separate contacts if nothing else worked
+        if not contacts:
+            # Create contacts from emails found
+            for email in set(emails):
+                contacts.append({
+                    "Name": "",
+                    "Role": "",
+                    "Email": email,
+                    "Phone": "",
+                    "LinkedIn": "",
+                    "Source": "AI Research",
+                    "Confidence": "Medium",
+                    "Notes": "Extracted from text"
+                })
+            
+            # Create contacts from phones found
+            for phone in set(phones):
+                phone_clean = re.sub(r'[^\d+\-\s\(\)]', '', phone)
+                if len(phone_clean.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")) >= 7:
+                    contacts.append({
+                        "Name": "",
+                        "Role": "",
+                        "Email": "",
+                        "Phone": phone_clean.strip(),
+                        "LinkedIn": "",
+                        "Source": "AI Research",
+                        "Confidence": "Medium",
+                        "Notes": "Extracted from text"
+                    })
+        
+        if contacts:
+            # Create clean DataFrame
+            df = pd.DataFrame(contacts)
+            
+            # Ensure all required columns exist
+            required_columns = ["Name", "Role", "Email", "Phone", "LinkedIn", "Source", "Confidence", "Notes"]
+            for col in required_columns:
+                if col not in df.columns:
+                    df[col] = ""
+            
+            # Reorder columns
+            df = df[required_columns]
+            
+            # Clean up data
+            df = df.fillna("")
+            df = df.replace("", "")
+            
+            # Remove completely empty rows
+            df = df.dropna(how='all', subset=["Name", "Email", "Phone"])
+            
+            if len(df) > 0:
                 return df
+    
     except Exception as e:
-        st.warning(f"Could not parse table format: {e}")
+        st.warning(f"Could not parse AI results: {e}")
     
     return None
 
@@ -1297,44 +1483,170 @@ def display_single_result(result, search_methods):
         ai_provider_name = "Google Gemini" if result.get('ai_provider') == "gemini" else "OpenRouter"
         st.subheader(f"🧠 AI Research Results ({ai_provider_name})")
         
-        with st.expander("📄 Full Research Report", expanded=True):
+        with st.expander("📄 Full AI Research Report", expanded=False):
             st.markdown(result['ai_research'])
+            
+            # Check if the AI actually followed the comprehensive search format
+            if "SOURCE 1:" not in result['ai_research'] or "SOURCE 2:" not in result['ai_research']:
+                st.warning("⚠️ **AI may not have searched all sources comprehensively.** The search may be incomplete.")
+                st.info("💡 **Tip**: Try a different AI model or provider for more thorough multi-source research.")
+            else:
+                st.success("✅ **Comprehensive multi-source search completed** - All 8 source categories were analyzed.")
         
         # Parse and display structured data
         df = parse_ai_results_to_dataframe(result['ai_research'])
-        if df is not None:
-            st.subheader("📊 Structured Contact Data")
-            st.dataframe(df, use_container_width=True)
+        if df is not None and len(df) > 0:
+            st.subheader("📊 Professional Contact Directory")
             
-            # Show contact count info
+            # Clean and style the dataframe
+            display_df = df.copy()
+            
+            # Clean up empty cells
+            display_df = display_df.fillna("")
+            display_df = display_df.replace("", "—")
+            
+            # Style the dataframe
+            def style_contacts(df):
+                """Apply professional styling to the contacts dataframe"""
+                styles = []
+                for idx, row in df.iterrows():
+                    row_style = []
+                    for col in df.columns:
+                        if col == "Confidence":
+                            if row[col] == "High":
+                                row_style.append("background-color: #d4edda; color: #155724;")
+                            elif row[col] == "Medium":
+                                row_style.append("background-color: #fff3cd; color: #856404;")
+                            elif row[col] == "Low":
+                                row_style.append("background-color: #f8d7da; color: #721c24;")
+                            else:
+                                row_style.append("")
+                        elif col == "Email" and "@" in str(row[col]):
+                            row_style.append("color: #0066cc; font-weight: bold;")
+                        elif col == "Name" and row[col] != "—":
+                            row_style.append("font-weight: bold;")
+                        else:
+                            row_style.append("")
+                    styles.append(row_style)
+                return styles
+            
+            # Display with professional formatting
+            st.dataframe(
+                display_df,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Name": st.column_config.TextColumn("👤 Name", width="medium"),
+                    "Role": st.column_config.TextColumn("💼 Role/Title", width="medium"),
+                    "Email": st.column_config.TextColumn("📧 Email", width="large"),
+                    "Phone": st.column_config.TextColumn("📞 Phone", width="medium"),
+                    "LinkedIn": st.column_config.LinkColumn("🔗 LinkedIn", width="large"),
+                    "Source": st.column_config.TextColumn("📍 Source", width="medium"),
+                    "Confidence": st.column_config.TextColumn("✅ Quality", width="small"),
+                    "Notes": st.column_config.TextColumn("📝 Notes", width="large")
+                }
+            )
+            
+            # Show contact summary
             contact_count = len(df)
-            if contact_count > 1:
-                st.success(f"🎯 Found {contact_count} contacts using {ai_provider_name}! In batch processing, this would create {contact_count} separate rows in your results CSV.")
-            elif contact_count == 1:
-                st.info(f"📧 Found 1 contact using {ai_provider_name}. Additional contacts may be found through website scraping.")
+            high_confidence = len(df[df["Confidence"] == "High"])
+            emails_found = len(df[df["Email"] != "—"])
+            phones_found = len(df[df["Phone"] != "—"])
             
-            # Export options
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("📊 Total Contacts", contact_count)
+            with col2:
+                st.metric("✅ High Quality", high_confidence)
+            with col3:
+                st.metric("📧 Emails Found", emails_found)
+            with col4:
+                st.metric("📞 Phones Found", phones_found)
+            
+            if contact_count > 1:
+                st.success(f"🎯 Found {contact_count} contacts using {ai_provider_name}! In batch processing, this creates {contact_count} separate CSV rows.")
+            elif contact_count == 1:
+                st.info(f"📧 Found 1 contact using {ai_provider_name}. Website scraping may find additional contacts.")
+            
+            # Quality breakdown
+            if contact_count > 0:
+                confidence_counts = df["Confidence"].value_counts()
+                st.write("**Contact Quality Breakdown:**")
+                for confidence, count in confidence_counts.items():
+                    if confidence == "High":
+                        st.write(f"🟢 High Quality: {count} contacts")
+                    elif confidence == "Medium":
+                        st.write(f"🟡 Medium Quality: {count} contacts")
+                    elif confidence == "Low":
+                        st.write(f"🟠 Low Quality: {count} contacts")
+            
+            # Export options with better formatting
             timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-            csv_data = df.to_csv(index=False).encode("utf-8")
+            
+            # Create clean export dataframe
+            export_df = df.copy()
+            export_df = export_df.replace("—", "")
+            
+            csv_data = export_df.to_csv(index=False).encode("utf-8")
             excel_buffer = io.BytesIO()
-            df.to_excel(excel_buffer, index=False)
+            
+            # Create professional Excel export
+            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                export_df.to_excel(writer, sheet_name='Contacts', index=False)
+                
+                # Try to apply styling if openpyxl.styles is available
+                try:
+                    # Get workbook and worksheet
+                    workbook = writer.book
+                    worksheet = writer.sheets['Contacts']
+                    
+                    # Style the header
+                    header_fill = PatternFill(start_color='366092', end_color='366092', fill_type='solid')
+                    header_font = Font(color='FFFFFF', bold=True)
+                    
+                    for cell in worksheet[1]:
+                        cell.fill = header_fill
+                        cell.font = header_font
+                        cell.alignment = Alignment(horizontal='center')
+                    
+                    # Auto-adjust column widths
+                    for column in worksheet.columns:
+                        max_length = 0
+                        column_letter = column[0].column_letter
+                        for cell in column:
+                            try:
+                                if len(str(cell.value)) > max_length:
+                                    max_length = len(str(cell.value))
+                            except:
+                                pass
+                        adjusted_width = min(max_length + 2, 50)
+                        worksheet.column_dimensions[column_letter].width = adjusted_width
+                except:
+                    # If styling fails, just continue with basic Excel file
+                    pass
+            
             excel_data = excel_buffer.getvalue()
             
             col1, col2 = st.columns(2)
             with col1:
                 st.download_button(
-                    "⬇️ Download CSV",
+                    "⬇️ Download Professional CSV",
                     data=csv_data,
                     file_name=f"{result['company'].lower().replace(' ', '_')}_contacts_{timestamp}.csv",
-                    mime="text/csv"
+                    mime="text/csv",
+                    help="Clean CSV format ready for CRM import"
                 )
             with col2:
                 st.download_button(
-                    "⬇️ Download Excel",
+                    "⬇️ Download Formatted Excel",
                     data=excel_data,
                     file_name=f"{result['company'].lower().replace(' ', '_')}_contacts_{timestamp}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    help="Professional Excel format with styling"
                 )
+        else:
+            st.warning("No structured contact data could be extracted from AI research results.")
+            st.info("💡 Try using website scraping or a different AI model for better results.")
 
 def process_batch_companies(provider, api_key, model, companies_df, search_methods, progress_callback=None):
     """Process multiple companies with progress tracking"""
