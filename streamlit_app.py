@@ -442,6 +442,14 @@ Begin comprehensive research for {company} now. Be thorough and systematic.
     
     return prompt
 
+def check_gemini_availability():
+    """Check if Google GenerativeAI library is available"""
+    try:
+        import google.generativeai as genai
+        return True
+    except ImportError:
+        return False
+
 def query_gemini_api(api_key, prompt, timeout=120):
     """Query Google Gemini API for contact research"""
     try:
@@ -463,7 +471,8 @@ def query_gemini_api(api_key, prompt, timeout=120):
         return response.text
         
     except ImportError:
-        st.error("Google GenerativeAI library not installed. Using OpenRouter fallback.")
+        st.error("🚨 Google GenerativeAI library not available. Please check requirements.txt installation.")
+        st.info("💡 **Fix**: Add `google-generativeai>=0.7.0` to requirements.txt and redeploy")
         return None
     except Exception as e:
         st.error(f"Gemini API error: {e}")
@@ -472,6 +481,9 @@ def query_gemini_api(api_key, prompt, timeout=120):
 def get_available_ai_providers(openrouter_key=None, gemini_key=None):
     """Get list of available AI providers and their models"""
     providers = {}
+    
+    # Check Gemini availability
+    gemini_available = check_gemini_availability()
     
     # OpenRouter models
     if openrouter_key:
@@ -512,8 +524,8 @@ def get_available_ai_providers(openrouter_key=None, gemini_key=None):
         except:
             pass
     
-    # Gemini models
-    if gemini_key:
+    # Gemini models (only if library is available and API key provided)
+    if gemini_key and gemini_available:
         providers["gemini"] = {
             "name": "Google Gemini",
             "models": {
@@ -525,6 +537,9 @@ def get_available_ai_providers(openrouter_key=None, gemini_key=None):
                 ]
             }
         }
+    elif gemini_key and not gemini_available:
+        # Show warning if API key provided but library not available
+        st.warning("⚠️ Gemini API key provided but google-generativeai library not installed")
     
     return providers
 
@@ -872,15 +887,39 @@ def main():
     
     with col2:
         st.markdown("**Google Gemini API**")
+        
+        # Check if Gemini library is available
+        gemini_available = check_gemini_availability()
+        
+        if not gemini_available:
+            st.warning("⚠️ Google GenerativeAI library not installed")
+            with st.expander("🔧 Quick Fix Instructions"):
+                st.markdown("""
+                **Add to requirements.txt:**
+                ```
+                google-generativeai>=0.7.0
+                ```
+                
+                **Then redeploy your app.**
+                
+                **Alternative:** Use OpenRouter only - it has 100+ models including web search!
+                """)
+        
         if not gemini_key:
             gemini_key = st.text_input(
                 "Gemini API Key", 
                 type="password",
                 help="Get your API key from https://aistudio.google.com/",
-                key="gemini_input"
+                key="gemini_input",
+                disabled=not gemini_available
             )
+            if not gemini_available:
+                st.caption("⚠️ Disabled: Library not installed")
         else:
-            st.success("✅ Gemini API key loaded from secrets")
+            if gemini_available:
+                st.success("✅ Gemini API key loaded from secrets")
+            else:
+                st.warning("⚠️ API key available but library not installed")
     
     # Check if at least one API key is available
     if not openrouter_key and not gemini_key:
@@ -897,8 +936,25 @@ def main():
     with st.spinner("Loading AI providers and models..."):
         providers = get_available_ai_providers(openrouter_key, gemini_key)
     
-    if not providers:
-        st.error("Failed to load any AI providers. Please check your API keys.")
+    # Show provider status
+    if providers:
+        provider_count = len(providers)
+        provider_names = [providers[p]["name"] for p in providers.keys()]
+        st.success(f"✅ {provider_count} AI provider(s) available: {', '.join(provider_names)}")
+    else:
+        st.error("❌ No AI providers available")
+        
+        # Show specific issues
+        if openrouter_key and not any("openrouter" in p for p in providers.keys()):
+            st.error("🔑 OpenRouter API key may be invalid")
+        
+        if gemini_key and not any("gemini" in p for p in providers.keys()):
+            if not check_gemini_availability():
+                st.error("📦 Google GenerativeAI library not installed")
+                st.code("pip install google-generativeai>=0.7.0")
+            else:
+                st.error("🔑 Gemini API key may be invalid")
+        
         st.stop()
     
     # Sidebar configuration
