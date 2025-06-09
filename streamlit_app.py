@@ -4,7 +4,6 @@ import pandas as pd
 import re
 from datetime import datetime
 import validators
-import whois
 from urllib.parse import urlparse, urljoin
 import time
 import json
@@ -13,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 import threading
 from bs4 import BeautifulSoup
 import urllib.robotparser
+import subprocess
 
 # Initialize session state
 if 'selected_model' not in st.session_state:
@@ -66,11 +66,13 @@ class WebScraper:
         """Check if we can fetch the URL according to robots.txt"""
         try:
             rp = urllib.robotparser.RobotFileParser()
-            rp.set_url(urljoin(url, '/robots.txt'))
+            robots_url = urljoin(url, '/robots.txt')
+            rp.set_url(robots_url)
             rp.read()
             return rp.can_fetch('*', url)
-        except:
-            return True  # If we can't check robots.txt, assume it's okay
+        except Exception:
+            # If we can't check robots.txt, assume it's okay but be respectful
+            return True
     
     def fetch_page(self, url, timeout=30):
         """Fetch a single page with error handling"""
@@ -81,8 +83,17 @@ class WebScraper:
             response = self.session.get(url, timeout=timeout)
             response.raise_for_status()
             return response
+        except requests.exceptions.HTTPError as e:
+            # Don't show 404 errors as warnings - they're expected
+            if e.response.status_code == 404:
+                return None
+            else:
+                st.warning(f"HTTP error {e.response.status_code} for {url}")
+                return None
         except requests.exceptions.RequestException as e:
-            st.warning(f"Failed to fetch {url}: {str(e)[:100]}...")
+            # Only show significant errors
+            if "timeout" in str(e).lower():
+                st.warning(f"Timeout fetching {url}")
             return None
     
     def extract_contacts_from_text(self, text, url=""):
@@ -170,14 +181,23 @@ class WebScraper:
         contact_links = []
         links = soup.find_all('a', href=True)
         
+        # Look for contact-related links in the actual page content
         for link in links:
             href = link['href']
-            link_text = href.lower()
-            if any(keyword in link_text for keyword in self.contact_keywords):
+            link_text = (link.get_text() or '').lower()
+            href_lower = href.lower()
+            
+            # Check both href and link text for contact keywords
+            is_contact_link = (
+                any(keyword in href_lower for keyword in self.contact_keywords) or
+                any(keyword in link_text for keyword in ['contact', 'about', 'team', 'impressum'])
+            )
+            
+            if is_contact_link:
                 absolute_url = urljoin(base_url, href)
                 contact_links.append(absolute_url)
         
-        return contact_links
+        return list(set(contact_links))  # Remove duplicates
     
     def scrape_website(self, start_url, max_pages=5):
         """Scrape website for contact information"""
@@ -187,60 +207,100 @@ class WebScraper:
                 start_url = 'https://' + start_url
             
             domain = urlparse(start_url).netloc
-            pages_to_visit = [start_url]
             visited_pages = set()
-            
-            # Common contact page paths to try
-            common_paths = [
-                '/contact', '/contact-us', '/about', '/team', '/staff',
-                '/impressum', '/kontakt', '/about-us', '/leadership'
-            ]
-            
-            # Add common contact pages
-            for path in common_paths:
-                contact_url = urljoin(start_url, path)
-                pages_to_visit.append(contact_url)
+            pages_found = 0
             
             progress_placeholder = st.empty()
             
-            for i, url in enumerate(pages_to_visit[:max_pages]):
-                if url in visited_pages:
+            # Step 1: Scrape homepage first
+            progress_placeholder.info(f"🏠 Analyzing homepage: {start_url}")
+            
+            homepage_response = self.fetch_page(start_url)
+            if not homepage_response:
+                st.warning(f"Could not access homepage: {start_url}")
+                return None
+            
+            visited_pages.add(start_url)
+            self.contacts_found['pages_scraped'].append(start_url)
+            pages_found += 1
+            
+            # Parse homepage
+            homepage_soup = BeautifulSoup(homepage_response.content, 'html.parser')
+            homepage_text = homepage_soup.get_text()
+            
+            # Extract contacts from homepage
+            self.extract_contacts_from_text(homepage_text, start_url)
+            self.extract_names_from_soup(homepage_soup)
+            self.extract_addresses_from_text(homepage_text)
+            self.extract_social_links(homepage_soup)
+            
+            # Step 2: Find actual contact links from homepage
+            contact_links_found = self.find_contact_links(homepage_soup, start_url)
+            
+            progress_placeholder.info(f"🔍 Found {len(contact_links_found)} potential contact pages")
+            
+            # Step 3: Try contact links found on homepage
+            for contact_url in contact_links_found[:max_pages-1]:  # Reserve space for homepage
+                if contact_url in visited_pages or pages_found >= max_pages:
                     continue
                 
-                progress_placeholder.info(f"🌐 Scraping page {i+1}/{min(len(pages_to_visit), max_pages)}: {url}")
+                progress_placeholder.info(f"📄 Scraping contact page {pages_found+1}: {urlparse(contact_url).path}")
                 
-                response = self.fetch_page(url)
+                response = self.fetch_page(contact_url)
                 if not response:
                     continue
                 
-                visited_pages.add(url)
-                self.contacts_found['pages_scraped'].append(url)
+                visited_pages.add(contact_url)
+                self.contacts_found['pages_scraped'].append(contact_url)
+                self.contacts_found['contact_pages'].append(contact_url)
+                pages_found += 1
                 
-                # Parse with BeautifulSoup
+                # Parse contact page
                 soup = BeautifulSoup(response.content, 'html.parser')
                 text = soup.get_text()
                 
-                # Extract contacts
-                self.extract_contacts_from_text(text, url)
+                # Extract contacts with higher confidence from contact pages
+                self.extract_contacts_from_text(text, contact_url)
                 self.extract_names_from_soup(soup)
                 self.extract_addresses_from_text(text)
                 self.extract_social_links(soup)
                 
-                # If this looks like a contact page, mark it
-                if any(keyword in url.lower() for keyword in self.contact_keywords):
-                    self.contacts_found['contact_pages'].append(url)
-                
-                # Find more contact links (only from homepage)
-                if url == start_url:
-                    new_contact_links = self.find_contact_links(soup, start_url)
-                    for link in new_contact_links:
-                        if link not in pages_to_visit and urlparse(link).netloc == domain:
-                            pages_to_visit.append(link)
-                
                 # Add delay to be respectful
                 time.sleep(1)
             
-            progress_placeholder.success("✅ Web scraping completed!")
+            # Step 4: If we haven't found many pages, try common paths as fallback
+            if pages_found < 3:
+                common_paths = ['/contact', '/about', '/team', '/kontakt', '/impressum']
+                
+                for path in common_paths:
+                    if pages_found >= max_pages:
+                        break
+                        
+                    fallback_url = urljoin(start_url, path)
+                    if fallback_url in visited_pages:
+                        continue
+                    
+                    response = self.fetch_page(fallback_url)
+                    if not response:
+                        continue  # 404s are normal, don't show as errors
+                    
+                    visited_pages.add(fallback_url)
+                    self.contacts_found['pages_scraped'].append(fallback_url)
+                    self.contacts_found['contact_pages'].append(fallback_url)
+                    pages_found += 1
+                    
+                    # Parse page
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    text = soup.get_text()
+                    
+                    self.extract_contacts_from_text(text, fallback_url)
+                    self.extract_names_from_soup(soup)
+                    self.extract_addresses_from_text(text)
+                    self.extract_social_links(soup)
+                    
+                    time.sleep(1)
+            
+            progress_placeholder.success(f"✅ Web scraping completed! Analyzed {pages_found} pages")
             
             # Convert sets to lists for JSON serialization
             return {
@@ -430,36 +490,99 @@ def query_openrouter_enhanced(api_key, model, prompt, timeout=120):
 def get_whois_contacts(domain):
     """Extract comprehensive contacts from WHOIS data"""
     try:
-        w = whois.whois(domain)
-        contacts = {
-            'domain': domain,
-            'registrar': getattr(w, 'registrar', None),
-            'creation_date': getattr(w, 'creation_date', None),
-            'expiration_date': getattr(w, 'expiration_date', None),
-            'name_servers': getattr(w, 'name_servers', None),
-            'emails': [],
-            'org': getattr(w, 'org', None),
-            'country': getattr(w, 'country', None)
-        }
+        # Try different whois implementations
+        w = None
         
-        # Extract all emails
-        if hasattr(w, 'emails') and w.emails:
-            if isinstance(w.emails, list):
-                contacts['emails'] = list(set(w.emails))  # Remove duplicates
-            else:
-                contacts['emails'] = [w.emails]
+        # Method 1: Try python-whois
+        try:
+            import whois
+            if hasattr(whois, 'whois'):
+                w = whois.whois(domain)
+            elif hasattr(whois, 'query'):
+                w = whois.query(domain)
+        except:
+            pass
         
-        # Get additional fields
-        for field in ['admin_email', 'tech_email', 'billing_email']:
-            if hasattr(w, field):
-                email = getattr(w, field)
-                if email and email not in contacts['emails']:
-                    contacts['emails'].append(email)
+        # Method 2: Try alternative whois approach
+        if w is None:
+            try:
+                import subprocess
+                import json
+                result = subprocess.run(['whois', domain], capture_output=True, text=True, timeout=30)
+                if result.returncode == 0:
+                    # Parse basic info from whois text output
+                    whois_text = result.stdout.lower()
+                    emails = re.findall(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', result.stdout)
+                    
+                    return {
+                        'domain': domain,
+                        'registrar': None,
+                        'creation_date': None,
+                        'expiration_date': None,
+                        'name_servers': None,
+                        'emails': list(set(emails)) if emails else [],
+                        'org': None,
+                        'country': None,
+                        'raw_data': result.stdout[:500] + "..." if len(result.stdout) > 500 else result.stdout
+                    }
+            except:
+                pass
+        
+        # Method 3: If we have whois object, parse it
+        if w:
+            contacts = {
+                'domain': domain,
+                'registrar': getattr(w, 'registrar', None),
+                'creation_date': getattr(w, 'creation_date', None),
+                'expiration_date': getattr(w, 'expiration_date', None),
+                'name_servers': getattr(w, 'name_servers', None),
+                'emails': [],
+                'org': getattr(w, 'org', None),
+                'country': getattr(w, 'country', None)
+            }
             
-        return contacts
+            # Extract all emails
+            if hasattr(w, 'emails') and w.emails:
+                if isinstance(w.emails, list):
+                    contacts['emails'] = list(set(w.emails))  # Remove duplicates
+                else:
+                    contacts['emails'] = [w.emails]
+            
+            # Get additional fields
+            for field in ['admin_email', 'tech_email', 'billing_email']:
+                if hasattr(w, field):
+                    email = getattr(w, field)
+                    if email and email not in contacts['emails']:
+                        contacts['emails'].append(email)
+            
+            return contacts
+        
+        # If all methods fail, return minimal info
+        return {
+            'domain': domain,
+            'registrar': None,
+            'creation_date': None,
+            'expiration_date': None,
+            'name_servers': None,
+            'emails': [],
+            'org': None,
+            'country': None,
+            'error': 'WHOIS lookup not available'
+        }
+            
     except Exception as e:
-        st.warning(f"WHOIS lookup failed for {domain}: {e}")
-        return None
+        # Return error info instead of None
+        return {
+            'domain': domain,
+            'registrar': None,
+            'creation_date': None,
+            'expiration_date': None,
+            'name_servers': None,
+            'emails': [],
+            'org': None,
+            'country': None,
+            'error': f'WHOIS lookup failed: {str(e)}'
+        }
 
 def process_single_company(api_key, model, company, website, country, industry="", search_methods=None):
     """Process a single company and return results"""
@@ -622,12 +745,19 @@ def main():
     st.markdown("*Web scraping + AI research + WHOIS lookup + Professional networks + Batch processing*")
     st.markdown("**✅ Streamlit Cloud Compatible Version**")
     
-    # Load API key
-    api_key = st.secrets.get("OPENROUTER_API_KEY") or st.text_input(
-        "🔐 OpenRouter API Key", 
-        type="password",
-        help="Get your API key from https://openrouter.ai/"
-    )
+    # Load API key from Streamlit secrets or user input
+    api_key = None
+    try:
+        api_key = st.secrets.get("OPENROUTER_API_KEY")
+    except:
+        pass
+    
+    if not api_key:
+        api_key = st.text_input(
+            "🔐 OpenRouter API Key", 
+            type="password",
+            help="Get your API key from https://openrouter.ai/"
+        )
     
     if not api_key:
         st.error("API key required to proceed")
@@ -688,10 +818,29 @@ def main():
         # Search settings
         st.subheader("🔍 Search Methods")
         
+        # Check if WHOIS is available
+        whois_available = True
+        try:
+            import whois
+            if not (hasattr(whois, 'whois') or hasattr(whois, 'query')):
+                whois_available = False
+        except ImportError:
+            whois_available = False
+        
+        default_methods = ["Website Scraping", "AI Research"]
+        if whois_available:
+            default_methods.append("WHOIS Lookup")
+        
+        available_methods = ["Website Scraping", "AI Research"]
+        if whois_available:
+            available_methods.append("WHOIS Lookup")
+        else:
+            st.warning("⚠️ WHOIS lookup not available in this environment")
+        
         search_methods = st.multiselect(
             "Active Search Methods",
-            ["Website Scraping", "AI Research", "WHOIS Lookup"],
-            default=["Website Scraping", "AI Research", "WHOIS Lookup"],
+            available_methods,
+            default=default_methods,
             help="All methods work in Streamlit Cloud"
         )
         
@@ -810,20 +959,32 @@ def display_single_result(result, search_methods):
         with st.expander("📋 WHOIS Domain Information", expanded=True):
             whois_data = result['whois_data']
             
-            col1, col2 = st.columns(2)
-            with col1:
-                if whois_data.get('org'):
-                    st.info(f"**Registered Organization**: {whois_data['org']}")
-                if whois_data.get('registrar'):
-                    st.info(f"**Registrar**: {whois_data['registrar']}")
-                if whois_data.get('country'):
-                    st.info(f"**Country**: {whois_data['country']}")
-            
-            with col2:
-                if whois_data.get('emails'):
-                    st.info(f"**Contact Emails**: {', '.join(whois_data['emails'])}")
-                if whois_data.get('creation_date'):
-                    st.info(f"**Domain Created**: {whois_data['creation_date']}")
+            # Check if there was an error
+            if whois_data.get('error'):
+                st.warning(f"⚠️ {whois_data['error']}")
+                if whois_data.get('raw_data'):
+                    st.text_area("Raw WHOIS Data", whois_data['raw_data'], height=100)
+            else:
+                col1, col2 = st.columns(2)
+                with col1:
+                    if whois_data.get('org'):
+                        st.info(f"**Registered Organization**: {whois_data['org']}")
+                    if whois_data.get('registrar'):
+                        st.info(f"**Registrar**: {whois_data['registrar']}")
+                    if whois_data.get('country'):
+                        st.info(f"**Country**: {whois_data['country']}")
+                
+                with col2:
+                    if whois_data.get('emails'):
+                        st.info(f"**Contact Emails**: {', '.join(whois_data['emails'])}")
+                    if whois_data.get('creation_date'):
+                        st.info(f"**Domain Created**: {whois_data['creation_date']}")
+                    
+                # Show additional info if available
+                if whois_data.get('name_servers'):
+                    st.info(f"**Name Servers**: {', '.join(whois_data['name_servers']) if isinstance(whois_data['name_servers'], list) else whois_data['name_servers']}")
+                if whois_data.get('expiration_date'):
+                    st.info(f"**Domain Expires**: {whois_data['expiration_date']}")
     
     # AI Research Results
     if "AI Research" in search_methods and result.get('ai_research'):
