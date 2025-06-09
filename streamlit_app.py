@@ -1552,10 +1552,10 @@ def display_single_result(result, search_methods):
                     "Name": st.column_config.TextColumn("👤 Name", width="medium"),
                     "Role": st.column_config.TextColumn("💼 Role/Title", width="medium"),
                     "Email": st.column_config.TextColumn("📧 Email", width="large"),
-                    "Phone": st.column_config.TextColumn("📞 Phone", width="medium"),
                     "LinkedIn": st.column_config.LinkColumn("🔗 LinkedIn", width="large"),
                     "Source": st.column_config.TextColumn("📍 Source", width="medium"),
                     "Confidence": st.column_config.TextColumn("✅ Quality", width="small"),
+                    "Phone": st.column_config.TextColumn("📞 Phone", width="medium"),
                     "Notes": st.column_config.TextColumn("📝 Notes", width="large")
                 }
             )
