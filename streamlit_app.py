@@ -321,6 +321,7 @@ class WebScraper:
             st.error(f"Web scraping failed: {e}")
             return None
 
+
 def get_openrouter_models(api_key):
     """Get comprehensive list of OpenRouter models with categories"""
     try:
@@ -360,131 +361,54 @@ def get_openrouter_models(api_key):
         st.error(f"Failed to load models: {e}")
         return {"web_search": [], "free": [], "premium": []}
 
+
 def create_comprehensive_search_prompt(company, website, country, industry=""):
-    """Enhanced prompt that FORCES comprehensive multi-source searching"""
+    """Create comprehensive search prompt that searches ALL online sources"""
     domain = website.replace("https://", "").replace("http://", "").replace("www.", "").split("/")[0]
     
-    prompt = f"""
-You are a professional business intelligence researcher. You MUST search ALL the sources listed below for {company} (website: {website}) in {country}.
+    prompt = f"""Act as expert web researcher. Search on given website and every source like directory, social media publicly available online.
 
-**MANDATORY TASK: You must search EVERY single source below and report findings from EACH ONE:**
+Please find the names and roles of the CEO OR Founder OR Managing Director OR Managing Partner for the company {company} with the website "{website}" based in {country}.
 
-**SOURCE 1: OFFICIAL WEBSITE ANALYSIS**
-Search {website} thoroughly:
-- Main contact page, about page, team page
-- Leadership/management pages
-- Contact forms and directories
-- Impressum page (German sites)
-REPORT: What contacts did you find on their official website?
+With the person you found, provide their personal LinkedIn URLs and work email addresses using the domain @{domain}. Find top one contact only. Also include the general company contact email.
 
-**SOURCE 2: LINKEDIN PROFESSIONAL SEARCH**
-Search LinkedIn for "{company}" employees:
-- Current executives (CEO, CTO, CFO, Directors)
-- Department heads (HR, Sales, Marketing)
-- Key personnel with public profiles
-REPORT: Which LinkedIn profiles did you find with contact information?
+Present the information in a table with name, role, full linkedin url, work email, general email, source with real link, confidence.
 
-**SOURCE 3: BUSINESS DIRECTORY SEARCH**
-Check business directories:
-- Google Business listing
-- Yellow Pages entries
-- Local chamber of commerce
-- Industry-specific directories
-REPORT: What directory listings exist for this company?
+SEARCH ALL THESE SOURCES:
+1. Company website ({website}) - Homepage, About page, Team page, Contact page, Leadership section
+2. LinkedIn company page and executive profiles
+3. Crunchbase company profile
+4. ZoomInfo business directory
+5. Apollo.io contact database
+6. Hunter.io email finder
+7. Google search results for "{company} CEO" and "{company} founder"
+8. News articles and press releases mentioning company leadership
+9. Business directories (Yellow Pages, Yelp Business, etc.)
+10. Industry-specific directories and databases
+11. Social media platforms (Twitter, Facebook business pages)
+12. Company filings and regulatory documents
+13. Interview articles and company announcements
+14. Professional networking sites (XING for German companies)
+15. Industry publications and trade magazines
 
-**SOURCE 4: XING PROFESSIONAL NETWORK** (especially for German companies)
-Search Xing.com for company employees:
-- German business professionals
-- Executive profiles
-- Contact information
-REPORT: Which Xing profiles are available?
+REQUIREMENTS:
+- Find REAL person names, not placeholders
+- Provide REAL LinkedIn URLs that work (full https://linkedin.com/in/username format)
+- Use actual email addresses following @{domain} pattern
+- Include source with real, working link where information was found
+- Rate confidence as High/Medium/Low based on source reliability
+- If not found after comprehensive search, clearly state "NOT FOUND"
+- Focus on current leadership (not former executives)
 
-**SOURCE 5: NEWS AND PRESS SEARCH**
-Look for recent mentions:
-- Press releases with spokesperson contacts
-- News articles mentioning executives
-- Industry publication interviews
-- Conference speaker listings
-REPORT: What recent news mentions executives or contacts?
+Example format:
+| Name | Role | LinkedIn URL | Work Email | General Email | Source | Confidence |
+|------|------|--------------|------------|---------------|--------|------------|
+| John Smith | CEO | https://linkedin.com/in/johnsmith | j.smith@{domain} | info@{domain} | LinkedIn Profile | High |
 
-**SOURCE 6: TECHNICAL CONTACT SEARCH**
-Domain registration and technical info:
-- WHOIS registration data
-- SSL certificate information
-- DNS administrator contacts
-REPORT: What technical contact information is available?
+Begin comprehensive multi-source research now."""
 
-**SOURCE 7: SOCIAL MEDIA BUSINESS PROFILES**
-Company social presence:
-- Facebook business page
-- Twitter/X corporate account
-- YouTube channel
-- Instagram business profile
-REPORT: What social media contacts are available?
-
-**SOURCE 8: GOVERNMENT AND LEGAL DATABASES**
-Official registrations:
-- Corporate registration databases
-- SEC filings (if public company)
-- Patent applications
-- Trademark registrations
-REPORT: What official government records show contacts?
-
-**CRITICAL REQUIREMENT: You MUST provide a separate section for EACH source above, even if you find nothing.**
-
-**OUTPUT FORMAT - EXACTLY like this:**
-
-## COMPREHENSIVE SEARCH RESULTS FOR {company}
-
-### SOURCE 1: OFFICIAL WEBSITE
-[Report findings from their website]
-
-### SOURCE 2: LINKEDIN SEARCH  
-[Report findings from LinkedIn]
-
-### SOURCE 3: BUSINESS DIRECTORIES
-[Report findings from directories]
-
-### SOURCE 4: XING NETWORK
-[Report findings from Xing]
-
-### SOURCE 5: NEWS AND PRESS
-[Report findings from news/press]
-
-### SOURCE 6: TECHNICAL CONTACTS
-[Report findings from technical sources]
-
-### SOURCE 7: SOCIAL MEDIA
-[Report findings from social media]
-
-### SOURCE 8: GOVERNMENT RECORDS
-[Report findings from official records]
-
-### STRUCTURED CONTACT TABLE
-
-| Name | Role/Title | Email | Phone | LinkedIn/Profile URL | Source | Confidence |
-|------|------------|-------|-------|---------------------|--------|------------|
-| [Name] | [Title] | [Email] | [Phone] | [URL] | [Which source] | High/Medium/Low |
-| [Name] | [Title] | [Email] | [Phone] | [URL] | [Which source] | High/Medium/Low |
-
-**MANDATORY: You must fill in the table with ALL contacts found across ALL sources.**
-
-**EMAIL PATTERNS TO VERIFY:**
-- info@{domain}, contact@{domain}, office@{domain}
-- firstname.lastname@{domain}
-- f.lastname@{domain}
-
-**CONFIDENCE LEVELS:**
-- High: Verified from official sources
-- Medium: Found in reliable directories
-- Low: Estimated or unverified
-
-**FAILURE TO SEARCH ALL 8 SOURCES ABOVE IS UNACCEPTABLE.**
-
-Begin your comprehensive multi-source research now.
-"""
-    
     return prompt
+
 
 def check_gemini_availability():
     """Check if Google GenerativeAI library is available"""
@@ -493,6 +417,7 @@ def check_gemini_availability():
         return True
     except ImportError:
         return False
+
 
 def query_gemini_api(api_key, prompt, timeout=120):
     """Query Google Gemini API for contact research"""
@@ -522,6 +447,7 @@ def query_gemini_api(api_key, prompt, timeout=120):
         st.error(f"Gemini API error: {e}")
         return None
 
+
 def get_available_ai_providers(openrouter_key=None, gemini_key=None):
     """Get list of available AI providers and their models"""
     providers = {}
@@ -534,39 +460,40 @@ def get_available_ai_providers(openrouter_key=None, gemini_key=None):
         try:
             resp = requests.get("https://openrouter.ai/api/v1/models", 
                                headers={"Authorization": f"Bearer {openrouter_key}"})
-            models = resp.json()["data"]
-            
-            # Categorize OpenRouter models
-            free_models = []
-            web_search_models = []
-            premium_models = []
-            
-            for model in models:
-                model_id = model["id"]
-                model_name = model.get("name", model_id)
-                pricing = model.get("pricing", {})
+            if resp.status_code == 200:
+                models = resp.json()["data"]
                 
-                is_free = (pricing.get("prompt", "0") == "0" and 
-                          pricing.get("completion", "0") == "0")
+                # Categorize OpenRouter models
+                free_models = []
+                web_search_models = []
+                premium_models = []
                 
-                if any(keyword in model_id.lower() for keyword in 
-                       ["perplexity", "online", "web", "search", "sonar"]):
-                    web_search_models.append((model_id, f"{model_name} (Web Search)"))
-                elif is_free:
-                    free_models.append((model_id, f"{model_name} (Free)"))
-                else:
-                    premium_models.append((model_id, f"{model_name}"))
-            
-            providers["openrouter"] = {
-                "name": "OpenRouter",
-                "models": {
-                    "web_search": sorted(web_search_models),
-                    "free": sorted(free_models),
-                    "premium": sorted(premium_models)
+                for model in models:
+                    model_id = model["id"]
+                    model_name = model.get("name", model_id)
+                    pricing = model.get("pricing", {})
+                    
+                    is_free = (pricing.get("prompt", "0") == "0" and 
+                              pricing.get("completion", "0") == "0")
+                    
+                    if any(keyword in model_id.lower() for keyword in 
+                           ["perplexity", "online", "web", "search", "sonar"]):
+                        web_search_models.append((model_id, f"{model_name} (Web Search)"))
+                    elif is_free:
+                        free_models.append((model_id, f"{model_name} (Free)"))
+                    else:
+                        premium_models.append((model_id, f"{model_name}"))
+                
+                providers["openrouter"] = {
+                    "name": "OpenRouter",
+                    "models": {
+                        "web_search": sorted(web_search_models),
+                        "free": sorted(free_models),
+                        "premium": sorted(premium_models)
+                    }
                 }
-            }
-        except:
-            pass
+        except Exception as e:
+            st.warning(f"Could not load OpenRouter models: {e}")
     
     # Gemini models (only if library is available and API key provided)
     if gemini_key and gemini_available:
@@ -587,15 +514,7 @@ def get_available_ai_providers(openrouter_key=None, gemini_key=None):
     
     return providers
 
-def query_ai_enhanced(provider, api_key, model, prompt, timeout=120):
-    """Enhanced AI query supporting multiple providers"""
-    if provider == "openrouter":
-        return query_openrouter_enhanced(api_key, model, prompt, timeout)
-    elif provider == "gemini":
-        return query_gemini_api(api_key, prompt, timeout)
-    else:
-        st.error(f"Unknown AI provider: {provider}")
-        return None
+
 def query_openrouter_enhanced(api_key, model, prompt, timeout=120):
     """Enhanced OpenRouter API query with better error handling"""
     url = "https://openrouter.ai/api/v1/chat/completions"
@@ -641,6 +560,110 @@ def query_openrouter_enhanced(api_key, model, prompt, timeout=120):
     
     return None
 
+
+def query_ai_enhanced(provider, api_key, model, prompt, timeout=120):
+    """Enhanced AI query supporting multiple providers"""
+    if provider == "openrouter":
+        return query_openrouter_enhanced(api_key, model, prompt, timeout)
+    elif provider == "gemini":
+        return query_gemini_api(api_key, prompt, timeout)
+    else:
+        st.error(f"Unknown AI provider: {provider}")
+        return None
+
+
+def validate_and_clean_ai_response(ai_result, company_name):
+    """Validate AI response and reject placeholder/lazy responses"""
+    if not ai_result:
+        return None, "No AI response received"
+    
+    # Check for lazy placeholder responses
+    placeholder_indicators = [
+        "[Name", "[Email", "[Phone", "[Not Publicly", 
+        "Name of Managing", "Name of Sales", "Name of Director",
+        "Email from Impressum", "Phone from Impressum", "Phone from Website",
+        "Not Publicly Available", "[URL]", "[Title]", "[Source]"
+    ]
+    
+    # Count placeholder indicators
+    placeholder_count = sum(1 for indicator in placeholder_indicators if indicator in ai_result)
+    
+    if placeholder_count > 2:
+        return None, f"AI provided lazy placeholder response ({placeholder_count} placeholders found) - rejecting"
+    
+    # Check for actual useful content
+    email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+    real_emails = re.findall(email_pattern, ai_result)
+    
+    # Filter out placeholder emails
+    real_emails = [email for email in real_emails if not any(placeholder in email for placeholder in ["example", "placeholder", "template"])]
+    
+    # Check for real names (not just titles)
+    name_patterns = [
+        r'\b[A-Z][a-z]+ [A-Z][a-z]+\b',  # First Last
+        r'\b[A-Z][a-z]+ [A-Z]\. [A-Z][a-z]+\b',  # First M. Last
+        r'\bDr\. [A-Z][a-z]+ [A-Z][a-z]+\b',  # Dr. First Last
+    ]
+    
+    real_names = []
+    for pattern in name_patterns:
+        names = re.findall(pattern, ai_result)
+        real_names.extend(names)
+    
+    # Remove generic names
+    generic_names = ["John Doe", "Jane Doe", "First Last", "Name Surname"]
+    real_names = [name for name in real_names if name not in generic_names]
+    
+    # Quality assessment
+    if len(real_emails) == 0 and len(real_names) == 0:
+        return None, "No real contact information found - only generic/placeholder content"
+    
+    quality_score = len(real_emails) + len(real_names)
+    
+    return ai_result, f"Response validated - found {len(real_emails)} real emails and {len(real_names)} real names"
+
+
+def query_ai_with_validation(provider, api_key, model, prompt, company_name, timeout=120):
+    """Query AI with validation and retry logic for better results"""
+    max_attempts = 2
+    
+    for attempt in range(max_attempts):
+        # Add attempt-specific instruction
+        if attempt > 0:
+            enhanced_prompt = f"""
+SECOND ATTEMPT - PREVIOUS RESPONSE WAS REJECTED FOR PLACEHOLDER TEXT
+
+{prompt}
+
+CRITICAL: Your previous response contained placeholder text like [Name] or [Email]. This is UNACCEPTABLE.
+Provide ONLY real, actual contact information or clearly state "NOT FOUND".
+NO BRACKETS [] OR PLACEHOLDER TEXT ALLOWED.
+"""
+        else:
+            enhanced_prompt = prompt
+        
+        # Get AI response
+        ai_result = query_ai_enhanced(provider, api_key, model, enhanced_prompt, timeout)
+        
+        if not ai_result:
+            continue
+        
+        # Validate response
+        validated_result, validation_message = validate_and_clean_ai_response(ai_result, company_name)
+        
+        if validated_result:
+            st.success(f"✅ {validation_message}")
+            return validated_result
+        else:
+            st.warning(f"⚠️ Attempt {attempt + 1}: {validation_message}")
+            if attempt < max_attempts - 1:
+                st.info("🔄 Retrying with stricter instructions...")
+    
+    # All attempts failed
+    st.error("❌ AI failed to provide real contact information after multiple attempts")
+    return "AI_VALIDATION_FAILED: No real contact information could be extracted. The AI provided only placeholder text or generic responses."
+
+
 def get_whois_contacts(domain):
     """Extract comprehensive contacts from WHOIS data"""
     try:
@@ -661,7 +684,6 @@ def get_whois_contacts(domain):
         if w is None:
             try:
                 import subprocess
-                import json
                 result = subprocess.run(['whois', domain], capture_output=True, text=True, timeout=30)
                 if result.returncode == 0:
                     # Parse basic info from whois text output
@@ -738,6 +760,7 @@ def get_whois_contacts(domain):
             'error': f'WHOIS lookup failed: {str(e)}'
         }
 
+
 def process_single_company(provider, api_key, model, company, website, country, industry="", search_methods=None):
     """Process a single company and return results"""
     try:
@@ -777,10 +800,10 @@ def process_single_company(provider, api_key, model, company, website, country, 
             scraper = WebScraper(company)
             results['web_scraping_data'] = scraper.scrape_website(website)
         
-        # AI research
+        # AI research with validation
         if "AI Research" in search_methods:
             prompt = create_comprehensive_search_prompt(company, website, country, industry)
-            results['ai_research'] = query_ai_enhanced(provider, api_key, model, prompt)
+            results['ai_research'] = query_ai_with_validation(provider, api_key, model, prompt, company)
         
         return results
         
@@ -790,6 +813,7 @@ def process_single_company(provider, api_key, model, company, website, country, 
             'website': website,
             'error': str(e)
         }
+
 
 def display_web_scraping_results(scraping_data):
     """Display web scraping results"""
@@ -858,155 +882,175 @@ def display_web_scraping_results(scraping_data):
             for page in scraping_data.get('pages_scraped', []):
                 st.markdown(f"- [{page}]({page})")
 
+
 def parse_ai_results_to_dataframe(ai_result):
-    """Parse AI research results into a clean, structured dataframe"""
+    """Parse AI research results with strict validation against placeholder text"""
     if not ai_result:
         return None
     
+    # Check if this is a validation failure
+    if "AI_VALIDATION_FAILED" in ai_result:
+        st.error("🚨 AI provided placeholder text instead of real contacts - results rejected")
+        return None
+    
     try:
-        # Method 1: Try to extract structured data from various formats
         contacts = []
         
-        # Look for email patterns first
-        emails = re.findall(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', ai_result)
+        # Enhanced extraction for real contact data
+        # 1. Extract real emails (not placeholders)
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        emails = re.findall(email_pattern, ai_result)
         
-        # Look for phone patterns
-        phones = re.findall(r'(\+?\d{1,4}[-.\s]?)?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}', ai_result)
+        # Filter out placeholder and example emails
+        real_emails = []
+        for email in emails:
+            if not any(placeholder in email.lower() for placeholder in 
+                      ['example', 'placeholder', 'template', 'test', 'sample', 'your', 'company']):
+                real_emails.append(email)
         
-        # Method 2: Try table parsing
-        lines = ai_result.split("\n")
-        table_lines = []
+        # 2. Extract real phone numbers
+        phone_patterns = [
+            r'\+\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}',  # International
+            r'\(\d{3}\)\s?\d{3}[-.\s]?\d{4}',  # US format
+            r'\d{3}[-.\s]?\d{3}[-.\s]?\d{4}',  # US format without parentheses
+        ]
         
-        # Find lines that look like table rows
+        real_phones = []
+        for pattern in phone_patterns:
+            phones = re.findall(pattern, ai_result)
+            for phone in phones:
+                # Validate phone length
+                clean_phone = re.sub(r'[^\d]', '', phone)
+                if len(clean_phone) >= 7:
+                    real_phones.append(phone.strip())
+        
+        # 3. Extract real person names (not placeholders)
+        name_patterns = [
+            r'\b[A-Z][a-z]+ [A-Z][a-z]+\b',  # First Last
+            r'\b[A-Z][a-z]+ [A-Z]\. [A-Z][a-z]+\b',  # First M. Last
+            r'\bDr\. [A-Z][a-z]+ [A-Z][a-z]+\b',  # Dr. First Last
+            r'\bProf\. [A-Z][a-z]+ [A-Z][a-z]+\b',  # Prof. First Last
+        ]
+        
+        real_names = []
+        for pattern in name_patterns:
+            names = re.findall(pattern, ai_result)
+            for name in names:
+                # Filter out generic/placeholder names
+                if not any(placeholder in name for placeholder in 
+                          ['John Doe', 'Jane Doe', 'First Last', 'Name Surname', 'Managing Director', 'Sales Director']):
+                    real_names.append(name)
+        
+        # 4. Try to parse table format if present
+        lines = ai_result.split('\n')
+        table_data = []
+        
         for line in lines:
-            if "|" in line and "---" not in line:
-                # Clean up the line
-                cells = [cell.strip() for cell in line.split("|") if cell.strip()]
-                if len(cells) >= 3:  # Minimum viable row
-                    table_lines.append(cells)
+            if '|' in line and not '---' in line:
+                cells = [cell.strip() for cell in line.split('|') if cell.strip()]
+                if len(cells) >= 3:
+                    # Check if this looks like a real data row (not header or placeholder)
+                    if not any(placeholder in '|'.join(cells) for placeholder in ['[', ']', 'Name', 'Email', 'Phone']):
+                        table_data.append(cells)
         
-        if len(table_lines) >= 2:
-            # Get headers from first line
-            headers = table_lines[0]
-            
-            # Standardize headers
-            standard_headers = ["Name", "Role", "Email", "Phone", "LinkedIn", "Source", "Confidence", "Notes"]
-            header_mapping = {}
-            
-            for i, header in enumerate(headers):
-                header_lower = header.lower()
-                if any(word in header_lower for word in ["name", "person", "contact"]):
-                    header_mapping[i] = "Name"
-                elif any(word in header_lower for word in ["role", "title", "position", "job"]):
-                    header_mapping[i] = "Role"
-                elif any(word in header_lower for word in ["email", "mail", "@"]):
-                    header_mapping[i] = "Email"
-                elif any(word in header_lower for word in ["phone", "tel", "mobile", "+", "number"]):
-                    header_mapping[i] = "Phone"
-                elif any(word in header_lower for word in ["linkedin", "profile", "url", "link"]):
-                    header_mapping[i] = "LinkedIn"
-                elif any(word in header_lower for word in ["source", "from"]):
-                    header_mapping[i] = "Source"
-                elif any(word in header_lower for word in ["confidence", "quality", "reliability"]):
-                    header_mapping[i] = "Confidence"
-                else:
-                    header_mapping[i] = "Notes"
-            
-            # Extract data rows
-            for row_cells in table_lines[1:]:
+        # 5. Create contacts from extracted data
+        # If we have table data, use that
+        if table_data:
+            for row in table_data:
                 contact = {
-                    "Name": "",
-                    "Role": "",
-                    "Email": "",
-                    "Phone": "",
-                    "LinkedIn": "",
-                    "Source": "AI Research",
-                    "Confidence": "Medium",
+                    "Name": row[0] if len(row) > 0 else "",
+                    "Role": row[1] if len(row) > 1 else "",
+                    "Email": row[2] if len(row) > 2 else "",
+                    "Phone": row[3] if len(row) > 3 else "",
+                    "LinkedIn": row[4] if len(row) > 4 else "",
+                    "Source": row[5] if len(row) > 5 else "AI Research",
+                    "Confidence": row[6] if len(row) > 6 else "Medium",
                     "Notes": ""
                 }
                 
-                for i, cell in enumerate(row_cells):
-                    if i in header_mapping:
-                        field = header_mapping[i]
-                        contact[field] = cell.strip()
-                
-                # Clean up the contact data
-                if contact["Email"]:
-                    # Validate email
-                    email_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', contact["Email"])
-                    if email_match:
-                        contact["Email"] = email_match.group()
-                
-                if contact["Phone"]:
-                    # Clean phone number
-                    phone_clean = re.sub(r'[^\d+\-\s\(\)]', '', contact["Phone"])
-                    if len(phone_clean.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")) >= 7:
-                        contact["Phone"] = phone_clean.strip()
-                    else:
-                        contact["Phone"] = ""
-                
-                # Only add if we have meaningful data
-                if contact["Email"] or contact["Phone"] or contact["Name"]:
+                # Validate this is real data
+                if (contact["Email"] and '@' in contact["Email"]) or \
+                   (contact["Name"] and len(contact["Name"]) > 3 and not '[' in contact["Name"]):
                     contacts.append(contact)
         
-        # Method 3: If table parsing failed, extract from text patterns
-        if not contacts:
-            text_lines = ai_result.split('\n')
-            current_contact = {}
-            
-            for line in text_lines:
-                line = line.strip()
-                if not line:
-                    continue
+        # If no table data, create contacts from extracted emails/phones/names
+        else:
+            # Create contacts from real emails
+            for email in real_emails:
+                # Try to find associated name in the text around the email
+                email_context = ""
+                lines = ai_result.split('\n')
+                for line in lines:
+                    if email in line:
+                        email_context = line
+                        break
                 
-                # Look for email in line
-                email_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', line)
-                if email_match:
-                    current_contact = {
-                        "Name": "",
-                        "Role": "",
-                        "Email": email_match.group(),
-                        "Phone": "",
-                        "LinkedIn": "",
-                        "Source": "AI Research",
-                        "Confidence": "Medium",
-                        "Notes": line
-                    }
-                    contacts.append(current_contact)
-        
-        # Method 4: Extract all emails and phones as separate contacts if nothing else worked
-        if not contacts:
-            # Create contacts from emails found
-            for email in set(emails):
-                contacts.append({
-                    "Name": "",
-                    "Role": "",
+                # Look for names near this email
+                associated_name = ""
+                associated_role = ""
+                
+                for name in real_names:
+                    if name in email_context or email_context in ai_result[ai_result.find(name):ai_result.find(name)+200]:
+                        associated_name = name
+                        # Try to find role near the name
+                        name_context = ai_result[max(0, ai_result.find(name)-100):ai_result.find(name)+100]
+                        roles = ['CEO', 'CTO', 'CFO', 'President', 'Director', 'Manager', 'VP', 'Head']
+                        for role in roles:
+                            if role in name_context:
+                                associated_role = role
+                                break
+                        break
+                
+                contact = {
+                    "Name": associated_name,
+                    "Role": associated_role,
                     "Email": email,
                     "Phone": "",
                     "LinkedIn": "",
                     "Source": "AI Research",
-                    "Confidence": "Medium",
-                    "Notes": "Extracted from text"
-                })
+                    "Confidence": "High" if associated_name else "Medium",
+                    "Notes": ""
+                }
+                contacts.append(contact)
             
-            # Create contacts from phones found
-            for phone in set(phones):
-                phone_clean = re.sub(r'[^\d+\-\s\(\)]', '', phone)
-                if len(phone_clean.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")) >= 7:
-                    contacts.append({
+            # Add phone-only contacts if we have phones not associated with emails
+            for phone in real_phones:
+                # Check if this phone is already associated with an email contact
+                phone_already_used = any(contact["Phone"] == phone for contact in contacts)
+                if not phone_already_used:
+                    contact = {
                         "Name": "",
                         "Role": "",
                         "Email": "",
-                        "Phone": phone_clean.strip(),
+                        "Phone": phone,
                         "LinkedIn": "",
-                        "Source": "AI Research",
+                        "Source": "AI Research", 
                         "Confidence": "Medium",
-                        "Notes": "Extracted from text"
-                    })
+                        "Notes": ""
+                    }
+                    contacts.append(contact)
         
-        if contacts:
+        # Final validation and cleanup
+        valid_contacts = []
+        for contact in contacts:
+            # Must have at least email OR phone OR name
+            if contact["Email"] or contact["Phone"] or contact["Name"]:
+                # Clean up empty fields
+                for key in contact:
+                    if not contact[key]:
+                        contact[key] = ""
+                
+                # Validate email format if present
+                if contact["Email"]:
+                    email_match = re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}, contact["Email"])
+                    if email_match:
+                        valid_contacts.append(contact)
+                elif contact["Phone"] or contact["Name"]:
+                    valid_contacts.append(contact)
+        
+        if valid_contacts:
             # Create clean DataFrame
-            df = pd.DataFrame(contacts)
+            df = pd.DataFrame(valid_contacts)
             
             # Ensure all required columns exist
             required_columns = ["Name", "Role", "Email", "Phone", "LinkedIn", "Source", "Confidence", "Notes"]
@@ -1017,10 +1061,6 @@ def parse_ai_results_to_dataframe(ai_result):
             # Reorder columns
             df = df[required_columns]
             
-            # Clean up data
-            df = df.fillna("")
-            df = df.replace("", "")
-            
             # Remove completely empty rows
             df = df.dropna(how='all', subset=["Name", "Email", "Phone"])
             
@@ -1028,9 +1068,10 @@ def parse_ai_results_to_dataframe(ai_result):
                 return df
     
     except Exception as e:
-        st.warning(f"Could not parse AI results: {e}")
+        st.warning(f"Error parsing AI results: {e}")
     
     return None
+
 
 def main():
     st.set_page_config(
@@ -1190,21 +1231,24 @@ def main():
             model_options = [f"{name}" for _, name in available_models]
             model_ids = [model_id for model_id, _ in available_models]
             
-            # Use session state to persist selection
+            # Use session state to persist selection with unique key for provider
             session_key = f'selected_model_{selected_provider}'
             if session_key not in st.session_state:
-                st.session_state[session_key] = None
+                st.session_state[session_key] = model_ids[0] if model_ids else None
             
-            if st.session_state[session_key] and st.session_state[session_key] in model_ids:
-                default_idx = model_ids.index(st.session_state[session_key])
-            else:
+            # Find current model index, default to 0 if not found
+            try:
+                current_model = st.session_state[session_key]
+                default_idx = model_ids.index(current_model) if current_model in model_ids else 0
+            except:
                 default_idx = 0
             
             selected_idx = st.selectbox(
                 "Select Model",
                 range(len(model_options)),
                 index=default_idx,
-                format_func=lambda x: model_options[x]
+                format_func=lambda x: model_options[x],
+                key=f"model_selector_{selected_provider}"
             )
             
             selected_model = model_ids[selected_idx]
@@ -1419,20 +1463,7 @@ def main():
                     - Use UTF-8 encoding to support international characters
                     - Remove any extra spaces or hidden characters
                     """)
-                
-                # Show file info for debugging
-                try:
-                    uploaded_file.seek(0)
-                    file_content = uploaded_file.read()
-                    st.info(f"📁 File size: {len(file_content)} bytes")
-                    
-                    # Try to detect encoding
-                    import chardet
-                    detected = chardet.detect(file_content)
-                    if detected:
-                        st.info(f"🔍 Detected encoding: {detected.get('encoding', 'Unknown')} (confidence: {detected.get('confidence', 0):.2%})")
-                except:
-                    pass
+
 
 def display_single_result(result, search_methods):
     """Display results for a single company"""
@@ -1484,14 +1515,21 @@ def display_single_result(result, search_methods):
         st.subheader(f"🧠 AI Research Results ({ai_provider_name})")
         
         with st.expander("📄 Full AI Research Report", expanded=False):
-            st.markdown(result['ai_research'])
-            
-            # Check if the AI actually followed the comprehensive search format
-            if "SOURCE 1:" not in result['ai_research'] or "SOURCE 2:" not in result['ai_research']:
-                st.warning("⚠️ **AI may not have searched all sources comprehensively.** The search may be incomplete.")
-                st.info("💡 **Tip**: Try a different AI model or provider for more thorough multi-source research.")
+            # Check if AI validation failed
+            if "AI_VALIDATION_FAILED" in result['ai_research']:
+                st.error("🚨 **AI Response Rejected** - Only placeholder text provided")
+                st.warning("The AI gave responses like '[Name of Director]' instead of real names")
+                st.info("💡 **Solutions**: Try a different AI model, provider, or test with a well-known company")
+                st.code(result['ai_research'], language="text")
             else:
-                st.success("✅ **Comprehensive multi-source search completed** - All 8 source categories were analyzed.")
+                st.markdown(result['ai_research'])
+                
+                # Check if the AI actually followed the comprehensive search format
+                if "NOT FOUND" not in result['ai_research'] and len(result['ai_research']) < 500:
+                    st.warning("⚠️ **AI may not have followed instructions properly.** Response seems too short for comprehensive search.")
+                    st.info("💡 **Tip**: Try a different AI model or provider for more thorough multi-source research.")
+                else:
+                    st.success("✅ **AI provided comprehensive response** - Multi-source contact search completed.")
         
         # Parse and display structured data
         df = parse_ai_results_to_dataframe(result['ai_research'])
@@ -1504,31 +1542,6 @@ def display_single_result(result, search_methods):
             # Clean up empty cells
             display_df = display_df.fillna("")
             display_df = display_df.replace("", "—")
-            
-            # Style the dataframe
-            def style_contacts(df):
-                """Apply professional styling to the contacts dataframe"""
-                styles = []
-                for idx, row in df.iterrows():
-                    row_style = []
-                    for col in df.columns:
-                        if col == "Confidence":
-                            if row[col] == "High":
-                                row_style.append("background-color: #d4edda; color: #155724;")
-                            elif row[col] == "Medium":
-                                row_style.append("background-color: #fff3cd; color: #856404;")
-                            elif row[col] == "Low":
-                                row_style.append("background-color: #f8d7da; color: #721c24;")
-                            else:
-                                row_style.append("")
-                        elif col == "Email" and "@" in str(row[col]):
-                            row_style.append("color: #0066cc; font-weight: bold;")
-                        elif col == "Name" and row[col] != "—":
-                            row_style.append("font-weight: bold;")
-                        else:
-                            row_style.append("")
-                    styles.append(row_style)
-                return styles
             
             # Display with professional formatting
             st.dataframe(
@@ -1648,6 +1661,7 @@ def display_single_result(result, search_methods):
             st.warning("No structured contact data could be extracted from AI research results.")
             st.info("💡 Try using website scraping or a different AI model for better results.")
 
+
 def process_batch_companies(provider, api_key, model, companies_df, search_methods, progress_callback=None):
     """Process multiple companies with progress tracking"""
     results = []
@@ -1671,6 +1685,7 @@ def process_batch_companies(provider, api_key, model, companies_df, search_metho
         time.sleep(2)
     
     return results
+
 
 def process_batch_csv(companies_df, provider, api_key, model, search_methods):
     """Process batch CSV with progress tracking"""
@@ -1755,7 +1770,7 @@ def process_batch_csv(companies_df, provider, api_key, model, search_methods):
                     for _, row in df.iterrows():
                         company_contacts.append({
                             'Name': row.get('Name', ''),
-                            'Role': row.get('Role/Title', row.get('Role', '')),
+                            'Role': row.get('Role', ''),
                             'Email': row.get('Email', ''),
                             'Phone': row.get('Phone', ''),
                             'Source': row.get('Source', 'AI Research'),
@@ -1887,6 +1902,7 @@ def process_batch_csv(companies_df, provider, api_key, model, search_methods):
         - Scalable for batch processing
         - Secure API key handling through Streamlit secrets
         """)
+
 
 if __name__ == "__main__":
     main()
