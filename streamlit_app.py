@@ -13,7 +13,6 @@ from concurrent.futures import ThreadPoolExecutor
 import threading
 from bs4 import BeautifulSoup
 import urllib.robotparser
-from urllib.parse import robots
 
 # Initialize session state
 if 'selected_model' not in st.session_state:
